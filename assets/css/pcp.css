@@ -492,7 +492,10 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 #cgProdutividade .cg-production-day-number small{font-weight:400;color:var(--muted-foreground)}
 #cgProdutividade .cg-production-adjacent{background:var(--card)}
 #cgProdutividade .cg-production-adjacent .cg-production-day-number{color:var(--muted-foreground)}
-#cgProdutividade .cg-production-grid .cg-production-total{padding:10px;vertical-align:top;background:var(--secondary);border-left:1px solid var(--border)}
+#cgProdutividade .cg-production-grid .cg-production-rest{background:var(--secondary)}
+#cgProdutividade .cg-production-grid .cg-production-total{padding:10px;vertical-align:top;background:color-mix(in srgb,var(--accent) 13%,var(--card));border-left:1px solid var(--border)}
+#cgProdutividade .cg-production-grid .cg-production-total[data-cg-total^="weekday-"]{background:color-mix(in srgb,var(--primary) 7%,var(--card))}
+#cgProdutividade .cg-production-grid .cg-production-total[data-cg-total="month"]{background:color-mix(in srgb,var(--primary) 15%,var(--card))}
 #cgProdutividade .cg-production-total .cg-production-heads strong{font-weight:750}
 #cgProdutividade .cg-production-total-label{display:block;margin-bottom:12px;font-size:11px;font-weight:650;color:var(--muted-foreground)}
 #cgProdutividade .cg-production-grid tfoot{border-top:2px solid var(--border)}

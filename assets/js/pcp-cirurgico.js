@@ -111,13 +111,14 @@ window.PcpCirurgico=(()=>{
  })();
  function createProductivityCalendar(content,fields,onNavigate,isLoading,getHeads=()=>({status:'idle',rows:[]})){
   const root=document.createElement('section');root.id='cgProdutividade';root.hidden=true;
-  root.innerHTML='<article class="card pcp-report-panel"><header class="cg-production-header"><h2>Calendário de Produção</h2><nav aria-label="Navegação do calendário"><button type="button" data-cg-month="-1" aria-label="Mês anterior">←</button><button type="button" data-cg-month="1" aria-label="Próximo mês">→</button></nav></header><p class="cg-production-notice">Consultando quantidade de cabeças…</p><div class="cg-production-months"></div></article><article class="card pcp-report-panel cg-production-detail" hidden aria-live="polite" aria-atomic="true"></article><article class="card pcp-report-panel"><header><h2>Acumulado mensal</h2></header></article>';
+  root.innerHTML='<article class="card pcp-report-panel"><header class="cg-production-header"><h2>Calendário de Produção</h2><nav aria-label="Navegação do calendário"><button type="button" data-cg-month="-1" aria-label="Mês anterior">←</button><button type="button" data-cg-month="1" aria-label="Próximo mês">→</button></nav></header><p class="cg-production-notice">Consultando quantidade de aves…</p><div class="cg-production-months"></div></article><article class="card pcp-report-panel cg-production-detail" hidden aria-live="polite" aria-atomic="true"></article><article class="card pcp-report-panel"><header><h2>Acumulado mensal</h2></header></article>';
   content.prepend(root);
   const monthsHost=root.querySelector('.cg-production-months'),detail=root.querySelector('.cg-production-detail');
   const weekdays=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
   const monthName=(year,month)=>new Date(Date.UTC(year,month-1,1)).toLocaleDateString('pt-BR',{month:'long',year:'numeric',timeZone:'UTC'});
   let selectedDay='',visibleDays=new Set();
   const formatHeads=value=>value==null?'—':value.toLocaleString('pt-BR',{maximumFractionDigits:6});
+  const birdUnit=value=>value===1?'ave':'aves';
   function dayHeads(date){
    if(getHeads().status!=='ready'||!PcpMulti.includes(fields.Grupo?.value,'producao'))return [];
    const companies=selectedHeadCompanies(fields.Unidade?.value),rows=getHeads().rows.filter(row=>row.data===date&&companies.includes(row.empresa_codigo));
@@ -125,7 +126,7 @@ window.PcpCirurgico=(()=>{
    return companies.map(code=>rows.find(row=>row.empresa_codigo===code)||{data:date,empresa_codigo:code,empresa:headCompanies[code],quantidade_cabecas:null});
   }
   function headsMarkup(rows){
-   return rows.length?'<span class="cg-production-heads">'+rows.map(row=>'<span><span>'+esc(row.empresa)+'</span><strong>'+esc(formatHeads(row.quantidade_cabecas))+' <small>cab.</small></strong></span>').join('')+'</span>':'<span class="cg-production-empty" aria-hidden="true">—</span>';
+   return rows.length?'<span class="cg-production-heads">'+rows.map(row=>'<span><span>'+esc(row.empresa)+'</span><strong>'+esc(formatHeads(row.quantidade_cabecas))+' <small>'+birdUnit(row.quantidade_cabecas)+'</small></strong></span>').join('')+'</span>':'<span class="cg-production-empty" aria-hidden="true">—</span>';
   }
   function totals(dates){
    if(getHeads().status!=='ready'||!PcpMulti.includes(fields.Grupo?.value,'producao'))return [];
@@ -140,7 +141,7 @@ window.PcpCirurgico=(()=>{
   }
   function emptyMessage(){
    const status=getHeads().status;
-   return status==='loading'?'Consultando quantidade de cabeças…':status==='error'?'Não foi possível consultar Cabeças. Altere os filtros ou recarregue a página para tentar novamente.':status!=='ready'?'Quantidade de cabeças ainda não consultada.':!PcpMulti.includes(fields.Grupo?.value,'producao')?'Cabeças não pertence ao grupo selecionado.':'Sem registros de Cabeças para esta data e filtros.';
+   return status==='loading'?'Consultando quantidade de aves…':status==='error'?'Não foi possível consultar Aves. Altere os filtros ou recarregue a página para tentar novamente.':status!=='ready'?'Quantidade de aves ainda não consultada.':!PcpMulti.includes(fields.Grupo?.value,'producao')?'Aves não pertencem ao grupo selecionado.':'Sem registros de Aves para esta data e filtros.';
   }
   function periods(){
    const years=PcpMulti.values(fields.Ano.value),months=PcpMulti.values(fields.Mes.value);
@@ -154,7 +155,7 @@ window.PcpCirurgico=(()=>{
   }
   function renderDetail(){
    detail.hidden=!selectedDay;
-   if(selectedDay){const date=new Date(selectedDay+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}),rows=dayHeads(selectedDay);detail.innerHTML='<header><h2>Detalhamento do dia · '+esc(date)+'</h2></header>'+(rows.length?'<dl class="cg-production-heads-detail">'+rows.map(row=>'<div><dt>'+esc(row.empresa)+' · Cabeças</dt><dd>'+esc(formatHeads(row.quantidade_cabecas))+'</dd></div>').join('')+'</dl><p class="cg-production-notice">Maior Quantidade entre os registros com Descrição = Cabeças, por empresa e dia.</p>':'<p class="cg-production-notice">'+esc(emptyMessage())+'</p>');}
+   if(selectedDay){const date=new Date(selectedDay+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}),rows=dayHeads(selectedDay);detail.innerHTML='<header><h2>Detalhamento do dia · '+esc(date)+'</h2></header>'+(rows.length?'<dl class="cg-production-heads-detail">'+rows.map(row=>'<div><dt>'+esc(row.empresa)+' · Aves</dt><dd>'+esc(formatHeads(row.quantidade_cabecas))+'</dd></div>').join('')+'</dl><p class="cg-production-notice">Maior quantidade de aves por empresa e dia, conforme os registros da fonte.</p>':'<p class="cg-production-notice">'+esc(emptyMessage())+'</p>');}
    for(const button of monthsHost.querySelectorAll('[data-cg-day]'))button.setAttribute('aria-pressed',String(button.dataset.cgDay===selectedDay));
   }
   function render(){
@@ -162,7 +163,7 @@ window.PcpCirurgico=(()=>{
    const notice=root.querySelector('.cg-production-notice'),state=getHeads();
    const missing=state.status==='ready'?selectedHeadCompanies(fields.Unidade?.value).filter(code=>!state.rows.some(row=>row.empresa_codigo===code)).map(code=>headCompanies[code]):[];
    const fullWeek=!!fields.SemanaCheia?.checked;
-   notice.textContent=(state.status==='ready'&&PcpMulti.includes(fields.Grupo?.value,'producao')?'Cabeças · maior quantidade por empresa e dia.'+(missing.length?' '+missing.join(' e ')+': sem registros de Cabeças no período consultado.':''):emptyMessage())+(fullWeek?' Semana cheia: os totais incluem os dias dos meses vizinhos exibidos no calendário.':'');
+   notice.textContent=(state.status==='ready'&&PcpMulti.includes(fields.Grupo?.value,'producao')?'Aves · maior quantidade por empresa e dia.'+(missing.length?' '+missing.join(' e ')+': sem registros de Aves no período consultado.':''):emptyMessage())+(fullWeek?' Semana cheia: os totais incluem os dias dos meses vizinhos exibidos no calendário.':'');
    visibleDays=new Set();
    monthsHost.innerHTML=periods().map(({year,month})=>{
     const key=year+'-'+String(month).padStart(2,'0'),label=monthName(year,month),{dates}=productionMonth(year,month,fullWeek);
@@ -170,8 +171,10 @@ window.PcpCirurgico=(()=>{
      if(!date)return '<td class="cg-production-outside" aria-hidden="true"></td>';
      const day=Number(date.slice(8)),outside=date.slice(0,7)!==key,allowed=PcpMulti.includes(fields.Dia.value,date);
      if(allowed)visibleDays.add(date);
-     const rows=allowed?dayHeads(date):[],summary=rows.map(row=>row.empresa+': '+(row.quantidade_cabecas==null?'sem registro':formatHeads(row.quantidade_cabecas)+' cabeças')).join('; ');
-     return '<td'+(outside?' class="cg-production-adjacent"':'')+'><button type="button" data-cg-day="'+date+'" aria-pressed="false" aria-label="'+esc(day+' de '+(outside?monthName(Number(date.slice(0,4)),Number(date.slice(5,7))):label)+' · '+(allowed?(summary||emptyMessage()):'Fora do filtro de dia'))+'"'+(allowed?'':' disabled')+'><span class="cg-production-day-number">'+day+(outside?'<small>/'+date.slice(5,7)+'</small>':'')+'</span>'+headsMarkup(rows)+'</button></td>';
+     const rows=allowed?dayHeads(date):[],summary=rows.map(row=>row.empresa+': '+(row.quantidade_cabecas==null?'sem registro':formatHeads(row.quantidade_cabecas)+' '+birdUnit(row.quantidade_cabecas))).join('; ');
+     const bothEmpty=state.status==='ready'&&['10','111'].every(code=>(state.rows.find(row=>row.data===date&&row.empresa_codigo===code)?.quantidade_cabecas??0)===0);
+     const classes=[outside?'cg-production-adjacent':'',bothEmpty?'cg-production-rest':''].filter(Boolean).join(' ');
+     return '<td'+(classes?' class="'+classes+'"':'')+'><button type="button" data-cg-day="'+date+'" aria-pressed="false" aria-label="'+esc(day+' de '+(outside?monthName(Number(date.slice(0,4)),Number(date.slice(5,7))):label)+' · '+(allowed?(summary||emptyMessage()):'Fora do filtro de dia'))+'"'+(allowed?'':' disabled')+'><span class="cg-production-day-number">'+day+(outside?'<small>/'+date.slice(5,7)+'</small>':'')+'</span>'+headsMarkup(rows)+'</button></td>';
     });
     const weeks=Array.from({length:dates.length/7},(_,week)=>'<tr>'+slots.slice(week*7,week*7+7).join('')+totalCell(dates.slice(week*7,week*7+7),'week-'+week,'Total semanal')+'</tr>').join('');
     const footer=weekdays.map((day,index)=>totalCell(dates.filter((date,i)=>i%7===index),'weekday-'+index,'Total de '+day.toLowerCase())).join('')+totalCell(dates,'month',fullWeek?'Total do período':'Total do mês');
