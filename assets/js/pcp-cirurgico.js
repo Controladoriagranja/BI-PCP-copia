@@ -186,9 +186,15 @@ window.PcpCirurgico=(()=>{
   }
   root.addEventListener('click',event=>{
    const day=event.target.closest('[data-cg-day]');
-   if(day&&!day.disabled){selectedDay=day.dataset.cgDay;renderDetail();return;}
+   if(day&&!day.disabled){selectedDay=selectedDay===day.dataset.cgDay?'':day.dataset.cgDay;renderDetail();return;}
    const arrow=event.target.closest('[data-cg-month]');
    if(arrow&&!arrow.disabled){const target=targetMonth(Number(arrow.dataset.cgMonth));if(target){selectedDay='';onNavigate(target);}}
+  });
+  document.addEventListener('click',event=>{
+   if(!selectedDay)return;
+   const day=event.target.closest('[data-cg-day]');
+   if((day&&root.contains(day)&&!day.disabled)||detail.contains(event.target))return;
+   selectedDay='';renderDetail();
   });
   return {root,render,periods};
  }
