@@ -508,3 +508,7 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 .pcp-report[data-page="report-g8"] .cg-production-week-filter{display:inline-flex;align-items:center;gap:7px;margin-right:auto;color:var(--foreground);font-size:12px;cursor:pointer}
 .pcp-report[data-page="report-g8"] .cg-production-week-filter[hidden]{display:none}
 .pcp-report[data-page="report-g8"] .cg-production-week-filter input{width:14px;height:14px;margin:0;accent-color:var(--primary)}
+.pcp-report[data-page="report-g8"] .cg-filter-row{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px 18px}
+.pcp-report[data-page="report-g8"] .cg-filter-row>.cg-filter-grid{flex:1 1 770px;max-width:966px;min-width:0}
+.pcp-report[data-page="report-g8"] .cg-filter-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;flex:1 1 350px;min-width:0;min-height:36px;gap:12px}
+.pcp-report[data-page="report-g8"] #cgLimpar{background:var(--card);border-color:var(--border);color:var(--foreground)}

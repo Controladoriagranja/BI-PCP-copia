@@ -10,3 +10,6 @@ tests/frontend-previews/
 _site/
 _outputs/
 outputs/
+tests/
+tests/test_pcp_productivity_calendar.cjs
+tests/test_pcp_productivity_calendar.cjs

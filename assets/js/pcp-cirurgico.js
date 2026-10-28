@@ -140,7 +140,7 @@ window.PcpCirurgico=(()=>{
   }
   function emptyMessage(){
    const status=getHeads().status;
-   return status==='loading'?'Consultando quantidade de cabeças…':status==='error'?'Não foi possível consultar Cabeças. Use Atualizar para tentar novamente.':status!=='ready'?'Quantidade de cabeças ainda não consultada.':!PcpMulti.includes(fields.Grupo?.value,'producao')?'Cabeças não pertence ao grupo selecionado.':'Sem registros de Cabeças para esta data e filtros.';
+   return status==='loading'?'Consultando quantidade de cabeças…':status==='error'?'Não foi possível consultar Cabeças. Altere os filtros ou recarregue a página para tentar novamente.':status!=='ready'?'Quantidade de cabeças ainda não consultada.':!PcpMulti.includes(fields.Grupo?.value,'producao')?'Cabeças não pertence ao grupo selecionado.':'Sem registros de Cabeças para esta data e filtros.';
   }
   function periods(){
    const years=PcpMulti.values(fields.Ano.value),months=PcpMulti.values(fields.Mes.value);
@@ -192,7 +192,7 @@ window.PcpCirurgico=(()=>{
  function mount(){
   const mobile=PcpMobileScroll.active();
   const filter=document.querySelector('.filter-card');filter.className='card pcp-comparativo-filtros cg-filters';
-  filter.innerHTML='<div class="pcp-comparativo-filter-head"><h2>Filtros</h2><div><button type="button" id="cgAtualizar" class="button">Atualizar</button><button type="button" id="cgLimpar" class="button">Limpar filtros</button></div></div><div class="cg-filter-grid"><label>Grupo<select id="cgGrupo"><option value="">Todos</option><option value="familias">Famílias e miúdos</option><option value="producao">Produção e perdas</option></select></label><label>Ano<select id="cgAno"></select></label><label>Mês<select id="cgMes">'+Array.from({length:12},(_,i)=>'<option value="'+(i+1)+'">'+new Date(2026,i,1).toLocaleDateString('pt-BR',{month:'long'})+'</option>').join('')+'</select></label><label>Dia<select id="cgDia"><option value="">Todos</option></select></label><label>Unidade<select id="cgUnidade"><option value="">Todas</option><option value="10">Ave Nova</option><option value="1">1º turno - AN</option><option value="2">2º turno - AN</option><option value="111">Real Alimentos</option></select></label></div>';
+  filter.innerHTML='<div class="pcp-comparativo-filter-head"><h2>Filtros</h2><div><button type="button" id="cgLimpar" class="button">Limpar filtros</button></div></div><div class="cg-filter-grid"><label>Grupo<select id="cgGrupo"><option value="">Todos</option><option value="familias">Famílias e miúdos</option><option value="producao">Produção e perdas</option></select></label><label>Ano<select id="cgAno"></select></label><label>Mês<select id="cgMes">'+Array.from({length:12},(_,i)=>'<option value="'+(i+1)+'">'+new Date(2026,i,1).toLocaleDateString('pt-BR',{month:'long'})+'</option>').join('')+'</select></label><label>Dia<select id="cgDia"><option value="">Todos</option></select></label><label>Unidade<select id="cgUnidade"><option value="">Todas</option><option value="10">Ave Nova</option><option value="1">1º turno - AN</option><option value="2">2º turno - AN</option><option value="111">Real Alimentos</option></select></label></div>';
 
   const content=document.getElementById('pcpConteudo');content.className='pcp-report-panels';content.innerHTML='<article class="card pcp-report-panel"><header><h2>Indicadores por dia</h2></header><div id="cgDiario" class="cg-scroll"></div></article><article class="card pcp-report-panel"><header><h2>Acumulado mensal</h2><div hidden><p>Razões calculadas pelos pesos acumulados até D−1. A seleção de dia limita o quadro diário; o acumulado mantém o mês escolhido.</p><p>Condenação: menor ou igual à meta. Demais indicadores: maior ou igual à meta. Ausência de base é apresentada como —.</p></div></header><div id="cgMensal" class="cg-scroll"></div></article>';
   const ids=['Ano','Mes','Dia','Unidade','Grupo'],fields=Object.fromEntries(ids.map(k=>[k,document.getElementById('cg'+k)]));let data=null,generation=0,controller,loading=false;
@@ -211,15 +211,17 @@ window.PcpCirurgico=(()=>{
    for(const panel of yieldPanels)panel.hidden=mode==='produtividade';
    indicatorWeekFilter.hidden=mode!=='produtividade';
    productivity.root.hidden=mode!=='produtividade';productivity.render();
-   refreshHeads();
-   if(mode==='rendimento')requestAnimationFrame(scrollTablesToLatest);
+   if(mode==='rendimento'){load();requestAnimationFrame(scrollTablesToLatest);}
+   else refreshHeads(true);
   },[['rendimento','Rendimento'],['produtividade','Produtividade']]);
   indicatorFlags.setAttribute('aria-label','Tipo de indicador');
   indicatorFlags.querySelector('legend').textContent='Tipo de indicador';
   const indicatorToolbar=document.createElement('div');
-  indicatorToolbar.style.cssText='display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:12px;margin-top:12px';
+  indicatorToolbar.className='cg-filter-actions';
   indicatorToolbar.append(indicatorWeekFilter,indicatorFlags);
-  filter.append(indicatorToolbar);
+  const filterRow=document.createElement('div');filterRow.className='cg-filter-row';
+  filterRow.append(filter.querySelector('.cg-filter-grid'),indicatorToolbar);
+  filter.append(filterRow);
   async function refreshHeads(force=false){
    if(indicatorMode!=='produtividade'){
     if(headsController){headsGeneration++;headsController.abort();headsController=null;}
@@ -311,7 +313,9 @@ window.PcpCirurgico=(()=>{
    }catch(e){if(id!==generation||e.name==='AbortError')return;if(e.status===401||e.status===403){data=null;lineChart?.clear();if(dialog.open)dialog.close();document.getElementById('cgDiario').replaceChildren();document.getElementById('cgMensal').replaceChildren();}const error=document.getElementById('mensagemErro');error.textContent='Não foi possível atualizar o comparativo. '+(data?'A última consulta permanece visível.':'');error.classList.remove('hidden');}
    finally{if(id===generation){loading=false;productivity.render();}}
   }
-  fields.Ano.onchange=fields.Mes.onchange=()=>{fields.Dia.value='';load();};fields.Dia.onchange=fields.Unidade.onchange=fields.Grupo.onchange=render;document.getElementById('cgAtualizar').onclick=load;document.getElementById('cgLimpar').onclick=()=>{fields.Grupo.value=fields.Unidade.value=fields.Dia.value='';fields.Ano.value=now.getFullYear();fields.Mes.value=now.getMonth()+1;if(indicatorMode==='produtividade')fields.SemanaCheia.checked=false;load();};setInterval(()=>{if(!document.hidden&&!loading)load();},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!loading)load();});PcpMulti.enhance(filter);load();
+  fields.Ano.onchange=fields.Mes.onchange=()=>{fields.Dia.value='';load();};fields.Dia.onchange=fields.Unidade.onchange=fields.Grupo.onchange=render;document.getElementById('cgLimpar').onclick=()=>{fields.Grupo.value=fields.Unidade.value=fields.Dia.value='';fields.Ano.value=now.getFullYear();fields.Mes.value=now.getMonth()+1;if(indicatorMode==='produtividade')fields.SemanaCheia.checked=false;load();};
+  function refreshAutomatically(){if(indicatorMode==='rendimento'&&!document.hidden&&!loading)load();}
+  setInterval(refreshAutomatically,60000);document.addEventListener('visibilitychange',refreshAutomatically);PcpMulti.enhance(filter);load();
  }
  return {mount};
 })();
