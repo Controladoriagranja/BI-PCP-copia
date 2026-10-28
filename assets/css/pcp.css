@@ -479,16 +479,22 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 #cgProdutividade .cg-production-month+.cg-production-month{margin-top:24px}
 #cgProdutividade h3{font-size:15px;font-weight:650;text-transform:capitalize;margin:14px 0 12px;color:var(--foreground)}
 #cgProdutividade .cg-production-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
-#cgProdutividade .cg-production-grid{width:100%;min-width:560px;table-layout:fixed;border-collapse:collapse;font-size:12px}
+#cgProdutividade .cg-production-grid{width:100%;min-width:800px;table-layout:fixed;border-collapse:collapse;font-size:12px}
 #cgProdutividade .cg-production-grid th{padding:10px 4px;background:var(--secondary);color:var(--muted-foreground);font-weight:600}
 #cgProdutividade .cg-production-grid abbr{text-decoration:none}
 #cgProdutividade .cg-production-grid td{padding:0;vertical-align:top;border-top:1px solid var(--border);border-right:1px solid var(--border)}
 #cgProdutividade .cg-production-grid td:last-child{border-right:0}
-#cgProdutividade .cg-production-grid td:nth-child(n+6),#cgProdutividade .cg-production-outside{background:var(--muted)}
+#cgProdutividade .cg-production-grid td:first-child,#cgProdutividade .cg-production-grid td:nth-child(7),#cgProdutividade .cg-production-outside{background:var(--muted)}
 #cgProdutividade .cg-production-grid button{display:flex;flex-direction:column;align-items:flex-start;gap:14px;width:100%;min-height:106px;padding:10px;border:0;background:transparent;color:var(--foreground);text-align:left;font:inherit;cursor:pointer}
 #cgProdutividade .cg-production-grid button:hover:not(:disabled){background:var(--secondary)}
 #cgProdutividade .cg-production-grid button[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--primary);background:var(--secondary)}
 #cgProdutividade .cg-production-day-number{font-weight:650;font-variant-numeric:tabular-nums}
+#cgProdutividade .cg-production-day-number small{font-weight:400;color:var(--muted-foreground)}
+#cgProdutividade .cg-production-adjacent{background:var(--secondary)}
+#cgProdutividade .cg-production-adjacent .cg-production-day-number{color:var(--muted-foreground)}
+#cgProdutividade .cg-production-grid .cg-production-total{padding:10px;vertical-align:top;background:var(--secondary);border-left:1px solid var(--border)}
+#cgProdutividade .cg-production-total-label{display:block;margin-bottom:12px;font-size:11px;font-weight:650;color:var(--muted-foreground)}
+#cgProdutividade .cg-production-grid tfoot{border-top:2px solid var(--border)}
 #cgProdutividade .cg-production-empty{color:var(--muted-foreground)}
 #cgProdutividade .cg-production-heads{display:grid;gap:8px;width:100%;font-size:11px}
 #cgProdutividade .cg-production-heads>span{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:2px 8px;overflow-wrap:anywhere}
@@ -499,3 +505,6 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 #cgProdutividade .cg-production-heads-detail dd{font-size:20px;font-weight:650;margin:5px 0 0;font-variant-numeric:tabular-nums}
 #cgProdutividade .cg-production-sr{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%)}
 @media(max-width:767px){#cgProdutividade .cg-production-grid button{min-height:90px;padding:8px}}
+.pcp-report[data-page="report-g8"] .cg-production-week-filter{display:inline-flex;align-items:center;gap:7px;margin-right:auto;color:var(--foreground);font-size:12px;cursor:pointer}
+.pcp-report[data-page="report-g8"] .cg-production-week-filter[hidden]{display:none}
+.pcp-report[data-page="report-g8"] .cg-production-week-filter input{width:14px;height:14px;margin:0;accent-color:var(--primary)}

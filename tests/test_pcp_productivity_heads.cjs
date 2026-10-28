@@ -127,6 +127,25 @@ module.exports = (async () => {
     assert.equal(endpoint, APP_CONFIG.endpoints.modelo, 'Cancelamento impede consulta de registros'); return catalog;
   }, periods, '', { aborted: true }), error => error.name === 'AbortError');
 
+  const boundaryRows = [row(100, '10', { data_referencia: '2026-09-28' }), row(10), row(999, '10', { data_referencia: '2026-11-01' })];
+  const boundaryApi = (start, end, rows = boundaryRows) => async (endpoint, params) => {
+    if (endpoint === APP_CONFIG.endpoints.modelo) return catalog;
+    assert.equal(params.inicio, start); assert.equal(params.fim, end);
+    return { ok: true, tabela: endpoint.split('/').pop(), total: rows.length, pagina: 1, tamanho: 1000, dados: rows };
+  };
+  const regular = await heads.load(boundaryApi('2026-10-01', '2026-10-31'), periods, '', signal, false);
+  assert.deepEqual(plain(regular).map(r => r.data), ['2026-10-09']);
+  const complete = await heads.load(boundaryApi('2026-09-27', '2026-10-31'), periods, '', signal, true);
+  assert.deepEqual(plain(complete).map(r => r.data), ['2026-09-28', '2026-10-09']);
+  await heads.load(boundaryApi('2024-01-28', '2024-03-02', []), [{ year: 2024, month: 2 }], '', signal, true);
+  await heads.load(boundaryApi('2026-12-27', '2027-02-06', []), [{ year: 2027, month: 1 }], '', signal, true);
+  const overlapGet = async (endpoint, params) => endpoint === APP_CONFIG.endpoints.modelo ? catalog : ({
+    ok: true, tabela: endpoint.split('/').pop(), total: 1, pagina: 1, tamanho: 1000, dados: [row(70, '10', { data_referencia: '2026-10-31' })]
+  });
+  const overlap = await heads.load(overlapGet, [{ year: 2026, month: 10 }, { year: 2026, month: 11 }], '', signal, true);
+  assert.equal(overlap.length, 1, 'Semanas compartilhadas por meses selecionados não duplicam o registro diário');
+  assert.equal(overlap[0].quantidade_cabecas, 70);
+
   // Consultas antigas não podem repor valores de outro recorte ou outra flag.
   const pending = [];
   const state = {
@@ -134,7 +153,7 @@ module.exports = (async () => {
     indicatorMode: 'rendimento', fields: { Unidade: { value: '' } },
     productivity: { periods: () => periods, render() {} }, apiGet() {},
     AbortController: class { constructor() { this.signal = { aborted: false }; } abort() { this.signal.aborted = true; } },
-    productivityHeads: { load(get, periods, units, signal) { return new Promise((resolve, reject) => pending.push({ resolve, reject, signal })); } }
+    productivityHeads: { load(get, periods, units, signal, fullWeek) { return new Promise((resolve, reject) => pending.push({ resolve, reject, signal, fullWeek })); } }
   };
   const controller = source.slice(source.indexOf('  async function refreshHeads('), source.indexOf('  const dialog='));
   vm.runInNewContext(controller, state);
@@ -154,5 +173,12 @@ module.exports = (async () => {
   assert.equal(pending[3].signal.aborted, true);
   pending[3].resolve(result); await fourth;
   assert.equal(state.headsState.status, 'idle'); assert.equal(state.headsState.rows.length, 0);
+  state.indicatorMode = 'produtividade'; state.fields.SemanaCheia = { checked: false };
+  const fifth = state.refreshHeads(); assert.equal(pending[4].fullWeek, false);
+  pending[4].resolve(result); await fifth;
+  state.fields.SemanaCheia.checked = true;
+  const sixth = state.refreshHeads(); assert.equal(pending[5].fullWeek, true, 'Semana cheia invalida o recorte e solicita dias vizinhos');
+  pending[5].resolve(result); await sixth;
   console.log('OK: MAX por empresa/data, Descrição exata, paginação completa, empresas e turnos separados, catálogo, datas civis, nulos e erros.');
+  console.log('OK: consultas de Semana cheia incluem dias adjacentes, anos diferentes e não duplicam registros em períodos sobrepostos.');
 })();
