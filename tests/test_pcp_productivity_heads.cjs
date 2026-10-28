@@ -65,7 +65,7 @@ module.exports = (async () => {
   assert.ok(all.calls.filter(c => c.params.pagina).length > 1);
   const selected = api();
   assert.deepEqual(plain(await heads.load(selected.get, periods, '10,111', signal)), result);
-  assert.deepEqual([...new Set(selected.calls.filter(c => c.params.pagina).map(c => c.params.empresa))], ['10', '111']);
+  assert.ok(selected.calls.filter(c => c.params.pagina).every(c => c.params.empresa === undefined), 'Não depende do código de importação para consultar a empresa');
   const shifts = api([row(69414, '10', { turno_codigo: '1' }), row(39501, '10', { turno_codigo: '2' }), row(80560, '111')]);
   const shifted = plain(await heads.load(shifts.get, periods, '1,111', signal));
   assert.deepEqual(shifted.map(r => [r.empresa_codigo, r.quantidade_cabecas]), [['10', 69414], ['111', 80560]]);
@@ -75,6 +75,29 @@ module.exports = (async () => {
   const lastPage = api([row(1), row(2), row(108915)]);
   assert.equal((await heads.load(lastPage.get, periods, '10', signal))[0].quantidade_cabecas, 108915);
   const empty = api([]); assert.deepEqual(plain(await heads.load(empty.get, periods, '', signal)), []);
+
+  // Empresa original é respeitada mesmo quando os metadados possuem outros códigos.
+  const importedCodes = api([row(108915, '01', { empresa: 'AVE NOVA' }), row(80560, '10', { empresa: 'Real Alimentos' })]);
+  assert.deepEqual(plain(await heads.load(importedCodes.get, periods, '', signal)).map(r => [r.empresa_codigo, r.quantidade_cabecas]), [['10', 108915], ['111', 80560]]);
+  assert.deepEqual(plain(await heads.load(importedCodes.get, periods, '10', signal)).map(r => r.empresa_codigo), ['10']);
+  assert.deepEqual(plain(await heads.load(importedCodes.get, periods, '111', signal)).map(r => r.empresa_codigo), ['111']);
+  assert.deepEqual(plain(await heads.load(importedCodes.get, periods, '10,111', signal)).map(r => r.empresa_codigo), ['10', '111']);
+
+  // Real também pode estar no relatório diário Dados gerais, confirmado pelo catálogo.
+  const splitCatalog = { ...catalog, tabelas: [...catalog.tabelas, table('dados_gerais')] };
+  const sourceCalls = [];
+  const splitSources = async (endpoint, params) => {
+    if (endpoint === APP_CONFIG.endpoints.modelo) return splitCatalog;
+    const sourceTable = endpoint.split('/').pop(); sourceCalls.push(sourceTable);
+    assert.equal(params.empresa, undefined);
+    assert.equal(params.descricao, 'Cabeças');
+    const dados = sourceTable === 'dados_gerais' ? [row(80560, '10', { empresa: 'REAL' })] : [row(108915, '10', { empresa: 'Avenova' })];
+    return { ok: true, tabela: sourceTable, total: dados.length, pagina: 1, tamanho: 1000, dados };
+  };
+  assert.deepEqual(plain(await heads.load(splitSources, periods, '', signal)).map(r => [r.empresa_codigo, r.quantidade_cabecas]), [['10', 108915], ['111', 80560]]);
+  assert.deepEqual(sourceCalls, ['diario_industria', 'dados_gerais']);
+  assert.deepEqual(plain(await heads.load(splitSources, periods, '10', signal)).map(r => r.empresa_codigo), ['10']);
+  assert.deepEqual(plain(await heads.load(splitSources, periods, '111', signal)).map(r => r.empresa_codigo), ['111']);
 
   const missing = structuredClone(catalog); delete missing.tabelas[0].colunas.descricao;
   const invalid = api([], missing);

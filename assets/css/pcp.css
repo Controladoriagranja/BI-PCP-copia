@@ -491,10 +491,10 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 #cgProdutividade .cg-production-day-number{font-weight:650;font-variant-numeric:tabular-nums}
 #cgProdutividade .cg-production-empty{color:var(--muted-foreground)}
 #cgProdutividade .cg-production-heads{display:grid;gap:8px;width:100%;font-size:11px}
-#cgProdutividade .cg-production-heads>span{display:grid;gap:2px;overflow-wrap:anywhere}
+#cgProdutividade .cg-production-heads>span{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:2px 8px;overflow-wrap:anywhere}
 #cgProdutividade .cg-production-heads strong{font-size:13px;font-variant-numeric:tabular-nums}
 #cgProdutividade .cg-production-heads small{font-size:10px;font-weight:400;color:var(--muted-foreground)}
-#cgProdutividade .cg-production-heads-detail{display:flex;flex-wrap:wrap;gap:14px 32px;margin:16px 0}
+#cgProdutividade .cg-production-heads-detail{display:grid;gap:12px;margin:16px 0}
 #cgProdutividade .cg-production-heads-detail dt{font-size:12px;color:var(--muted-foreground)}
 #cgProdutividade .cg-production-heads-detail dd{font-size:20px;font-weight:650;margin:5px 0 0;font-variant-numeric:tabular-nums}
 #cgProdutividade .cg-production-sr{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%)}

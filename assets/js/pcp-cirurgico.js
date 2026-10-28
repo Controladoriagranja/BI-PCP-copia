@@ -2,6 +2,17 @@
 window.PcpCirurgico=(()=>{
  const esc=ApiScreen.escape,pct=v=>v==null?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
  const cols={'1':'1º turno - AN','2':'2º turno - AN','10':'Ave Nova - AN','111':'Real Alimentos'};
+ const headCompanies={'10':'Ave Nova','111':'Real Alimentos'};
+ function headCompany(value){
+  const text=String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  if(/^(?:0*10|an)$/.test(text)||/\bave ?nova\b/.test(text))return '10';
+  if(/^(?:0*111|ra|real)$/.test(text)||/\breal alimentos\b/.test(text))return '111';
+  return null;
+ }
+ function selectedHeadCompanies(units){
+  const selected=PcpMulti.values(units);
+  return ['10','111'].filter(code=>!selected.length||selected.includes(code)||(code==='10'&&selected.some(v=>v==='1'||v==='2')));
+ }
  // Fonte bruta já publicada. Nenhum indicador ou peso de Rendimento participa desta seleção.
  const productivityHeads=(()=>{
   function schema(catalog,table){
@@ -33,29 +44,43 @@ window.PcpCirurgico=(()=>{
   function collect(target,rows,columns,params){
    for(const row of rows){
     if(row[columns.description]!=='Cabeças')continue;
-    const date=civilDate(row[columns.date]),company=String(row[columns.company]??'').trim(),value=quantity(row[columns.quantity]);
+    // Empresa é o nome original do relatório; empresa_codigo é metadado da importação.
+    const company=headCompany(columns.name&&row[columns.name])||headCompany(row[columns.company]);
+    const date=civilDate(row[columns.date]),value=quantity(row[columns.quantity]);
     if(!date||!company||value===null||date<params.inicio||date>params.fim)continue;
-    if(params.empresa&&company!==params.empresa)continue;
+    if(params.empresas&&!params.empresas.includes(company))continue;
     if(params.turno&&String(row.turno_codigo)!==params.turno)continue;
-    const key=company+'|'+date,previous=target.get(key),name=String((columns.name&&row[columns.name])||({'10':'Ave Nova','111':'Real Alimentos'}[company])||company);
+    const key=company+'|'+date,previous=target.get(key),name=headCompanies[company];
     // MAX, inclusive entre páginas: nunca somar nem escolher o primeiro registro.
     if(!previous||value>previous.quantidade_cabecas||(value===previous.quantidade_cabecas&&name<previous.empresa))target.set(key,{data:date,empresa_codigo:company,empresa:name,quantidade_cabecas:value});
    }
   }
-  function scopes(units){
+  function scopes(units,catalog){
    const selected=PcpMulti.values(units);
-   if(!selected.length)return [{table:'diario_industria'}];
-   return selected.map(key=>key==='1'||key==='2'?{table:'diario_industria_turnos',empresa:'10',turno:key}:key==='10'||key==='111'?{table:'diario_industria',empresa:key}:null).filter(Boolean);
+   const companies=selected.length?selected.filter(key=>key==='10'||key==='111'):['10','111'];
+   const result=[];
+   // Os relatórios diários podem estar separados entre Diário da indústria e Dados gerais.
+   // Uma fonte complementar só é usada se o catálogo confirmar as mesmas colunas.
+   if(companies.length){
+    const daily=catalog.tabelas.some(t=>t.tabela==='diario_industria');
+    if(daily){schema(catalog,'diario_industria');result.push({table:'diario_industria',empresas:companies});}
+    if(catalog.tabelas.some(t=>t.tabela==='dados_gerais')){
+     try{schema(catalog,'dados_gerais');result.push({table:'dados_gerais',empresas:companies});}catch(e){if(!daily)throw e;}
+    }
+    if(!result.length)throw Error('Fonte diária de Cabeças não disponível no catálogo PCP.');
+   }
+   for(const turno of selected.filter(key=>key==='1'||key==='2'))result.push({table:'diario_industria_turnos',empresas:['10'],turno});
+   return result;
   }
   async function load(get,periods,units,signal){
    if(!periods.length)return [];
    const catalog=await get(APP_CONFIG.endpoints.modelo,{}, {silent:true,signal});
    if(!catalog.ok||!Array.isArray(catalog.tabelas))throw Error('Catálogo PCP indisponível.');
    const target=new Map();
-   for(const scope of scopes(units)){
-    const columns=schema(catalog,scope.table),{table,...filters}=scope;
+   for(const scope of scopes(units,catalog)){
+    const columns=schema(catalog,scope.table),{table,empresas,turno}=scope;
     for(const {year,month} of periods){
-     const prefix=year+'-'+String(month).padStart(2,'0'),params={...filters,inicio:prefix+'-01',fim:prefix+'-'+new Date(Date.UTC(year,month,0)).getUTCDate(),[columns.description]:'Cabeças'};
+     const prefix=year+'-'+String(month).padStart(2,'0'),params={...(turno?{turno}:{}),inicio:prefix+'-01',fim:prefix+'-'+new Date(Date.UTC(year,month,0)).getUTCDate(),[columns.description]:'Cabeças'};
      let page=1,expectedTotal=null,received=0;
      do{
       if(signal.aborted)throw new DOMException('Consulta cancelada','AbortError');
@@ -65,7 +90,7 @@ window.PcpCirurgico=(()=>{
       if(result.total!==expectedTotal||result.dados.length>result.tamanho)throw Error('A fonte de Cabeças mudou durante a consulta. Atualize novamente.');
       received+=result.dados.length;
       if(received>expectedTotal||(received<expectedTotal&&result.dados.length!==result.tamanho))throw Error('Paginação de Cabeças incompleta.');
-      collect(target,result.dados,columns,params);
+      collect(target,result.dados,columns,{...params,empresas});
       if(received===expectedTotal)break;
       page++;
      }while(true);
@@ -83,8 +108,13 @@ window.PcpCirurgico=(()=>{
   const weekdays=['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'];
   const monthName=(year,month)=>new Date(Date.UTC(year,month-1,1)).toLocaleDateString('pt-BR',{month:'long',year:'numeric',timeZone:'UTC'});
   let selectedDay='',visibleDays=new Set();
-  const formatHeads=value=>value.toLocaleString('pt-BR',{maximumFractionDigits:6});
-  const dayHeads=date=>getHeads().status==='ready'&&PcpMulti.includes(fields.Grupo?.value,'producao')?getHeads().rows.filter(row=>row.data===date):[];
+  const formatHeads=value=>value==null?'—':value.toLocaleString('pt-BR',{maximumFractionDigits:6});
+  function dayHeads(date){
+   if(getHeads().status!=='ready'||!PcpMulti.includes(fields.Grupo?.value,'producao'))return [];
+   const companies=selectedHeadCompanies(fields.Unidade?.value),rows=getHeads().rows.filter(row=>row.data===date&&companies.includes(row.empresa_codigo));
+   if(!rows.length)return [];
+   return companies.map(code=>rows.find(row=>row.empresa_codigo===code)||{data:date,empresa_codigo:code,empresa:headCompanies[code],quantidade_cabecas:null});
+  }
   function emptyMessage(){
    const status=getHeads().status;
    return status==='loading'?'Consultando quantidade de cabeças…':status==='error'?'Não foi possível consultar Cabeças. Use Atualizar para tentar novamente.':status!=='ready'?'Quantidade de cabeças ainda não consultada.':!PcpMulti.includes(fields.Grupo?.value,'producao')?'Cabeças não pertence ao grupo selecionado.':'Sem registros de Cabeças para esta data e filtros.';
@@ -107,7 +137,8 @@ window.PcpCirurgico=(()=>{
   function render(){
    if(root.hidden)return;
    const notice=root.querySelector('.cg-production-notice'),state=getHeads();
-   notice.textContent=state.status==='ready'&&PcpMulti.includes(fields.Grupo?.value,'producao')?'Cabeças · maior quantidade por empresa e dia.':emptyMessage();
+   const missing=state.status==='ready'?selectedHeadCompanies(fields.Unidade?.value).filter(code=>!state.rows.some(row=>row.empresa_codigo===code)).map(code=>headCompanies[code]):[];
+   notice.textContent=state.status==='ready'&&PcpMulti.includes(fields.Grupo?.value,'producao')?'Cabeças · maior quantidade por empresa e dia.'+(missing.length?' '+missing.join(' e ')+': sem registros de Cabeças no período consultado.':''):emptyMessage();
    visibleDays=new Set();
    monthsHost.innerHTML=periods().map(({year,month})=>{
     const key=year+'-'+String(month).padStart(2,'0'),label=monthName(year,month),offset=(new Date(Date.UTC(year,month-1,1)).getUTCDay()+6)%7,count=new Date(Date.UTC(year,month,0)).getUTCDate(),cells=Math.ceil((offset+count)/7)*7;
@@ -115,7 +146,7 @@ window.PcpCirurgico=(()=>{
      const day=index-offset+1;if(day<1||day>count)return '<td class="cg-production-outside" aria-hidden="true"></td>';
      const date=key+'-'+String(day).padStart(2,'0'),allowed=PcpMulti.includes(fields.Dia.value,date);
      if(allowed)visibleDays.add(date);
-     const rows=allowed?dayHeads(date):[],summary=rows.map(row=>row.empresa+': '+formatHeads(row.quantidade_cabecas)+' cabeças').join('; ');
+     const rows=allowed?dayHeads(date):[],summary=rows.map(row=>row.empresa+': '+(row.quantidade_cabecas==null?'sem registro':formatHeads(row.quantidade_cabecas)+' cabeças')).join('; ');
      return '<td><button type="button" data-cg-day="'+date+'" aria-pressed="false" aria-label="'+esc(day+' de '+label+' · '+(allowed?(summary||emptyMessage()):'Fora do filtro de dia'))+'"'+(allowed?'':' disabled')+'><span class="cg-production-day-number">'+day+'</span>'+(rows.length?'<span class="cg-production-heads">'+rows.map(row=>'<span><span>'+esc(row.empresa)+'</span><strong>'+esc(formatHeads(row.quantidade_cabecas))+' <small>cab.</small></strong></span>').join('')+'</span>':'<span class="cg-production-empty" aria-hidden="true">—</span>')+'</button></td>';
     });
     return '<div class="cg-production-month"><h3>'+esc(label)+'</h3><div class="cg-production-scroll"><table class="cg-production-grid"><caption class="cg-production-sr">Calendário de Produção · '+esc(label)+'</caption><thead><tr>'+weekdays.map(day=>'<th scope="col"><abbr title="'+day+'">'+day.slice(0,3)+'</abbr></th>').join('')+'</tr></thead><tbody>'+Array.from({length:cells/7},(_,week)=>'<tr>'+slots.slice(week*7,week*7+7).join('')+'</tr>').join('')+'</tbody></table></div></div>';
