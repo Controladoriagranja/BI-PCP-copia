@@ -16,7 +16,9 @@ const context = { window: {}, ApiScreen: { escape: String }, APP_CONFIG,
   DOMException: class extends Error { constructor(message, name) { super(message); this.name = name; } }
 };
 vm.runInNewContext(source.replace('return {mount};', 'return {mount,productivityHeads};'), context);
-const heads = context.window.PcpCirurgico.productivityHeads;
+const rawHeads = context.window.PcpCirurgico.productivityHeads;
+// Cada cenário informa um limite de dados; os históricos usam um limite posterior às suas datas fictícias.
+const heads = { load: (get, periods, units, signal, fullWeek = false, limit = '2099-12-31') => rawHeads.load(get, periods, units, signal, fullWeek, limit) };
 const table = name => ({ tabela: name,
   colunas: { descricao: 'text', quantidade: 'double precision', data_referencia: 'date', empresa_codigo: 'text', empresa: 'text', turno_codigo: 'text' },
   mapeamento: [{ coluna: 'descricao', nome_original: 'Descrição' }, { coluna: 'quantidade', nome_original: 'Quantidade' }]
@@ -146,20 +148,56 @@ module.exports = (async () => {
   assert.equal(overlap.length, 1, 'Semanas compartilhadas por meses selecionados não duplicam o registro diário');
   assert.equal(overlap[0].quantidade_cabecas, 70);
 
+  await assert.rejects(rawHeads.load(api().get, periods, '', signal), /Data limite/);
+  await assert.rejects(rawHeads.load(api().get, periods, '', signal, false, '2026-02-30'), /Data limite/);
+  const cutoffRows = [row(119543, '10', { data_referencia: '2026-10-27' }), row(26334, '10', { data_referencia: '2026-10-28' }), row(20064, '111', { data_referencia: '2026-10-28' })];
+  const cutoffApi = boundaryApi('2026-10-01', '2026-10-27', cutoffRows);
+  const cutoffResult = await rawHeads.load(cutoffApi, periods, '', signal, false, '2026-10-27');
+  assert.deepEqual(plain(cutoffResult).map(r => r.data), ['2026-10-27'], 'Ignora registros após D−1 mesmo se a API os devolver');
+  const cutoffComplete = await rawHeads.load(boundaryApi('2026-09-27', '2026-10-27', cutoffRows), periods, '', signal, true, '2026-10-27');
+  assert.deepEqual(plain(cutoffComplete).map(r => r.data), ['2026-10-27']);
+  let futureCalls = 0;
+  const futureResult = await rawHeads.load(async () => { futureCalls++; throw Error('Não consultar mês futuro'); }, [{ year: 2026, month: 11 }], '', signal, false, '2026-10-27');
+  assert.equal(futureCalls, 0); assert.equal(futureResult.length, 0);
+  const cutoffYear = await rawHeads.load(boundaryApi('2026-12-27', '2026-12-31', [row(10, '10', { data_referencia: '2027-01-01' })]), [{ year: 2027, month: 1 }], '', signal, true, '2026-12-31');
+  assert.equal(cutoffYear.length, 0, 'Semana cheia também respeita D−1 na virada de ano');
+
+  // A apresentação e todos os totais também devem rejeitar dados posteriores ao limite.
+  const displayedState = { status:'ready', limit:'2026-10-27', rows:[
+    {data:'2026-10-27',empresa_codigo:'10',empresa:'Ave Nova',quantidade_cabecas:119543},
+    {data:'2026-10-27',empresa_codigo:'111',empresa:'Real Alimentos',quantidade_cabecas:70952},
+    {data:'2026-10-28',empresa_codigo:'10',empresa:'Ave Nova',quantidade_cabecas:26334},
+    {data:'2026-10-28',empresa_codigo:'111',empresa:'Real Alimentos',quantidade_cabecas:20064}
+  ] };
+  const displayed = {
+    getHeads: () => displayedState, fields:{Grupo:{value:''},Unidade:{value:''},Dia:{value:''}},
+    selectedHeadCompanies: () => ['10','111'], headCompanies:{'10':'Ave Nova','111':'Real Alimentos'},
+    PcpMulti:{includes:(value,item) => !value || value.split(',').includes(String(item))}
+  };
+  const dailyCode = source.slice(source.indexOf('  function dayHeads(date){'), source.indexOf('  function headsMarkup(rows){'));
+  const totalCode = source.slice(source.indexOf('  function totals(dates){'), source.indexOf('  function totalCell(dates,kind,label){'));
+  vm.runInNewContext(dailyCode + totalCode, displayed);
+  assert.equal(displayed.dayHeads('2026-10-28').length, 0);
+  assert.equal(displayed.dayHeads('2026-10-27').length, 2);
+  assert.deepEqual(plain(displayed.totals(['2026-10-27','2026-10-28'])).map(r => r.quantidade_cabecas), [119543,70952], 'Totais não incluem os valores parciais do dia 28');
+  displayedState.limit='2026-10-28';
+  assert.deepEqual(plain(displayed.totals(['2026-10-27','2026-10-28'])).map(r => r.quantidade_cabecas), [145877,91016]);
+
   // Consultas antigas não podem repor valores de outro recorte ou outra flag.
   const pending = [];
   const state = {
     headsState: { status: 'idle', rows: [] }, headsKey: '', headsGeneration: 0, headsController: null,
-    indicatorMode: 'rendimento', fields: { Unidade: { value: '' } },
+    indicatorMode: 'rendimento', data: { data_limite: '2026-10-27' }, loading: false, fields: { Unidade: { value: '' } },
     productivity: { periods: () => periods, render() {} }, apiGet() {},
     AbortController: class { constructor() { this.signal = { aborted: false }; } abort() { this.signal.aborted = true; } },
-    productivityHeads: { load(get, periods, units, signal, fullWeek) { return new Promise((resolve, reject) => pending.push({ resolve, reject, signal, fullWeek })); } }
+    productivityHeads: { load(get, periods, units, signal, fullWeek, limit) { return new Promise((resolve, reject) => pending.push({ resolve, reject, signal, fullWeek, limit })); } }
   };
   const controller = source.slice(source.indexOf('  async function refreshHeads('), source.indexOf('  const dialog='));
   vm.runInNewContext(controller, state);
   await state.refreshHeads(); assert.equal(pending.length, 0, 'Rendimento não consulta Cabeças');
   state.indicatorMode = 'produtividade'; const first = state.refreshHeads();
   assert.equal(state.headsState.status, 'loading');
+  assert.equal(pending[0].limit, '2026-10-27', 'Usa a mesma data limite apresentada no cabeçalho');
   state.fields.Unidade.value = '111'; const second = state.refreshHeads();
   assert.equal(pending[0].signal.aborted, true);
   pending[0].resolve([row(999)]); await first;
@@ -179,6 +217,14 @@ module.exports = (async () => {
   state.fields.SemanaCheia.checked = true;
   const sixth = state.refreshHeads(); assert.equal(pending[5].fullWeek, true, 'Semana cheia invalida o recorte e solicita dias vizinhos');
   pending[5].resolve(result); await sixth;
+  state.data.data_limite = '2026-10-28';
+  const seventh = state.refreshHeads(); assert.equal(pending[6].limit, '2026-10-28', 'Mudança do limite invalida os dados anteriores');
+  pending[6].resolve(result); await seventh;
+  assert.equal(state.headsState.limit, '2026-10-28');
+  state.data = null; await state.refreshHeads();
+  assert.equal(pending.length, 7, 'Não consulta produtividade antes de obter o limite do relatório');
+  assert.equal(state.headsState.rows.length, 0);
   console.log('OK: MAX por empresa/data, Descrição exata, paginação completa, empresas e turnos separados, catálogo, datas civis, nulos e erros.');
   console.log('OK: consultas de Semana cheia incluem dias adjacentes, anos diferentes e não duplicam registros em períodos sobrepostos.');
+  console.log('OK: D−1 limita consultas, registros, semanas completas e meses futuros conforme o cabeçalho.');
 })();

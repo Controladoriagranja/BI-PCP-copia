@@ -81,15 +81,18 @@ window.PcpCirurgico=(()=>{
    for(const turno of selected.filter(key=>key==='1'||key==='2'))result.push({table:'diario_industria_turnos',empresas:['10'],turno});
    return result;
   }
-  async function load(get,periods,units,signal,fullWeek=false){
-   if(!periods.length)return [];
+  async function load(get,periods,units,signal,fullWeek=false,dateLimit){
+   const limit=civilDate(dateLimit);
+   if(!limit)throw Error('Data limite D−1 não confirmada pela consulta do relatório.');
+   const ranges=periods.map(({year,month})=>productionMonth(year,month,fullWeek)).filter(range=>range.inicio<=limit).map(range=>({...range,fim:range.fim<limit?range.fim:limit}));
+   if(!ranges.length)return [];
    const catalog=await get(APP_CONFIG.endpoints.modelo,{}, {silent:true,signal});
    if(!catalog.ok||!Array.isArray(catalog.tabelas))throw Error('Catálogo PCP indisponível.');
    const target=new Map();
    for(const scope of scopes(units,catalog)){
     const columns=schema(catalog,scope.table),{table,empresas,turno}=scope;
-    for(const {year,month} of periods){
-     const {inicio,fim}=productionMonth(year,month,fullWeek),params={...(turno?{turno}:{}),inicio,fim,[columns.description]:'Cabeças'};
+    for(const {inicio,fim} of ranges){
+     const params={...(turno?{turno}:{}),inicio,fim,[columns.description]:'Cabeças'};
      let page=1,expectedTotal=null,received=0;
      do{
       if(signal.aborted)throw new DOMException('Consulta cancelada','AbortError');
@@ -120,7 +123,7 @@ window.PcpCirurgico=(()=>{
   const formatHeads=value=>value==null?'—':value.toLocaleString('pt-BR',{maximumFractionDigits:6});
   const birdUnit=value=>value===1?'ave':'aves';
   function dayHeads(date){
-   if(getHeads().status!=='ready'||!PcpMulti.includes(fields.Grupo?.value,'producao'))return [];
+   if(getHeads().status!=='ready'||!getHeads().limit||date>getHeads().limit||!PcpMulti.includes(fields.Grupo?.value,'producao'))return [];
    const companies=selectedHeadCompanies(fields.Unidade?.value),rows=getHeads().rows.filter(row=>row.data===date&&companies.includes(row.empresa_codigo));
    if(!rows.length)return [];
    return companies.map(code=>rows.find(row=>row.empresa_codigo===code)||{data:date,empresa_codigo:code,empresa:headCompanies[code],quantidade_cabecas:null});
@@ -139,7 +142,8 @@ window.PcpCirurgico=(()=>{
   function totalCell(dates,kind,label){
    return '<td class="cg-production-total" data-cg-total="'+kind+'"><span class="cg-production-total-label">'+esc(label)+'</span>'+headsMarkup(totals(dates))+'</td>';
   }
-  function emptyMessage(){
+  function emptyMessage(date){
+   if(date&&getHeads().limit&&date>getHeads().limit)return 'Dados disponíveis até '+getHeads().limit.split('-').reverse().join('/')+' (D−1).';
    const status=getHeads().status;
    return status==='loading'?'Consultando quantidade de aves…':status==='error'?'Não foi possível consultar Aves. Altere os filtros ou recarregue a página para tentar novamente.':status!=='ready'?'Quantidade de aves ainda não consultada.':!PcpMulti.includes(fields.Grupo?.value,'producao')?'Aves não pertencem ao grupo selecionado.':'Sem registros de Aves para esta data e filtros.';
   }
@@ -155,7 +159,7 @@ window.PcpCirurgico=(()=>{
   }
   function renderDetail(){
    detail.hidden=!selectedDay;
-   if(selectedDay){const date=new Date(selectedDay+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}),rows=dayHeads(selectedDay);detail.innerHTML='<header><h2>Detalhamento do dia · '+esc(date)+'</h2></header>'+(rows.length?'<dl class="cg-production-heads-detail">'+rows.map(row=>'<div><dt>'+esc(row.empresa)+' · Aves</dt><dd>'+esc(formatHeads(row.quantidade_cabecas))+'</dd></div>').join('')+'</dl><p class="cg-production-notice">Maior quantidade de aves por empresa e dia, conforme os registros da fonte.</p>':'<p class="cg-production-notice">'+esc(emptyMessage())+'</p>');}
+   if(selectedDay){const date=new Date(selectedDay+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}),rows=dayHeads(selectedDay);detail.innerHTML='<header><h2>Detalhamento do dia · '+esc(date)+'</h2></header>'+(rows.length?'<dl class="cg-production-heads-detail">'+rows.map(row=>'<div><dt>'+esc(row.empresa)+' · Aves</dt><dd>'+esc(formatHeads(row.quantidade_cabecas))+'</dd></div>').join('')+'</dl><p class="cg-production-notice">Maior quantidade de aves por empresa e dia, conforme os registros da fonte.</p>':'<p class="cg-production-notice">'+esc(emptyMessage(selectedDay))+'</p>');}
    for(const button of monthsHost.querySelectorAll('[data-cg-day]'))button.setAttribute('aria-pressed',String(button.dataset.cgDay===selectedDay));
   }
   function render(){
@@ -174,7 +178,7 @@ window.PcpCirurgico=(()=>{
      const rows=allowed?dayHeads(date):[],summary=rows.map(row=>row.empresa+': '+(row.quantidade_cabecas==null?'sem registro':formatHeads(row.quantidade_cabecas)+' '+birdUnit(row.quantidade_cabecas))).join('; ');
      const bothEmpty=state.status==='ready'&&['10','111'].every(code=>(state.rows.find(row=>row.data===date&&row.empresa_codigo===code)?.quantidade_cabecas??0)===0);
      const classes=[outside?'cg-production-adjacent':'',bothEmpty?'cg-production-rest':''].filter(Boolean).join(' ');
-     return '<td'+(classes?' class="'+classes+'"':'')+'><button type="button" data-cg-day="'+date+'" aria-pressed="false" aria-label="'+esc(day+' de '+(outside?monthName(Number(date.slice(0,4)),Number(date.slice(5,7))):label)+' · '+(allowed?(summary||emptyMessage()):'Fora do filtro de dia'))+'"'+(allowed?'':' disabled')+'><span class="cg-production-day-number">'+day+(outside?'<small>/'+date.slice(5,7)+'</small>':'')+'</span>'+headsMarkup(rows)+'</button></td>';
+     return '<td'+(classes?' class="'+classes+'"':'')+'><button type="button" data-cg-day="'+date+'" aria-pressed="false" aria-label="'+esc(day+' de '+(outside?monthName(Number(date.slice(0,4)),Number(date.slice(5,7))):label)+' · '+(allowed?(summary||emptyMessage(date)):'Fora do filtro de dia'))+'"'+(allowed?'':' disabled')+'><span class="cg-production-day-number">'+day+(outside?'<small>/'+date.slice(5,7)+'</small>':'')+'</span>'+headsMarkup(rows)+'</button></td>';
     });
     const weeks=Array.from({length:dates.length/7},(_,week)=>'<tr>'+slots.slice(week*7,week*7+7).join('')+totalCell(dates.slice(week*7,week*7+7),'week-'+week,'Total semanal')+'</tr>').join('');
     const footer=weekdays.map((day,index)=>totalCell(dates.filter((date,i)=>i%7===index),'weekday-'+index,'Total de '+day.toLowerCase())).join('')+totalCell(dates,'month',fullWeek?'Total do período':'Total do mês');
@@ -237,17 +241,22 @@ window.PcpCirurgico=(()=>{
     headsKey='';headsState={status:'idle',rows:[]};
     return;
    }
-   const periods=productivity.periods(),units=fields.Unidade.value,fullWeek=!!fields.SemanaCheia?.checked,key=JSON.stringify([periods,units,fullWeek]);
+   const limit=data?.data_limite;
+   if(!limit){
+    if(headsController){headsGeneration++;headsController.abort();headsController=null;}
+    headsKey='';headsState={status:loading?'loading':'error',rows:[]};productivity.render();return;
+   }
+   const periods=productivity.periods(),units=fields.Unidade.value,fullWeek=!!fields.SemanaCheia?.checked,key=JSON.stringify([periods,units,fullWeek,limit]);
    if(!force&&headsKey===key)return;
    headsKey=key;const id=++headsGeneration;headsController?.abort();headsController=new AbortController();
-   headsState={status:'loading',rows:[]};productivity.render();
+   headsState={status:'loading',rows:[],limit};productivity.render();
    try{
-    const rows=await productivityHeads.load(apiGet,periods,units,headsController.signal,fullWeek);
+    const rows=await productivityHeads.load(apiGet,periods,units,headsController.signal,fullWeek,limit);
     if(id!==headsGeneration)return;
-    headsState={status:'ready',rows};
+    headsState={status:'ready',rows,limit};
    }catch(e){
     if(id!==headsGeneration)return;
-    headsState={status:'error',rows:[]};
+    headsState={status:'error',rows:[],limit};
    }finally{if(id===headsGeneration){headsController=null;productivity.render();}}
   }
   const dialog=document.createElement('dialog');dialog.className='cg-dialog';dialog.setAttribute('aria-labelledby','cgGraficoTitulo');dialog.innerHTML='<header class="cg-dialog-header"><div><h2 id="cgGraficoTitulo"></h2><p id="cgGraficoContexto"></p></div><div class="cg-dialog-actions"><button type="button" class="button" id="cgMaximizar" aria-pressed="false">Maximizar</button><button type="button" class="button cg-dialog-close">Fechar</button></div></header><div class="cg-chart-filters"><input type="hidden" id="cgGraficoModo" value="dias"><div id="cgCampoDias"><span>Dias · seleção múltipla</span><div id="cgGraficoDias" class="checkbox-multiselect"></div></div><div id="cgCampoSemanas" class="hidden"><span>Semanas · seleção múltipla</span><div id="cgGraficoSemanas" class="checkbox-multiselect"></div></div><div id="cgCampoUnidades"><span>Unidades · seleção múltipla</span><div id="cgGraficoUnidades" class="checkbox-multiselect"></div></div><button type="button" id="cgGraficoLimpar" class="button">Limpar seleção</button></div><div id="cgGraficoLinhas" class="cg-line-chart" aria-label="Evolução diária do indicador"></div>';document.body.append(dialog);
