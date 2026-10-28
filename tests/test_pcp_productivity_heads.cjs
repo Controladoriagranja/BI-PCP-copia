@@ -3,7 +3,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const crypto = require('node:crypto');
 const source = fs.readFileSync(path.join(__dirname, '../assets/js/pcp-cirurgico.js'), 'utf8');
+const index = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+for (const asset of ['assets/js/pcp-cirurgico.js', 'assets/css/pcp.css']) {
+  const version = crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname, '..', asset))).digest('hex').slice(0, 12);
+  assert.ok(index.includes(asset + '?v=' + version), `Atualizar versão de ${asset} no index para evitar cache antigo`);
+}
 const APP_CONFIG = { endpoints: { modelo: '/api/pcp/tabelas', tabelaModelo: '/api/pcp/dados/' } };
 const context = { window: {}, ApiScreen: { escape: String }, APP_CONFIG,
   PcpMulti: { values: value => String(value ?? '').split(',').filter(Boolean) },
