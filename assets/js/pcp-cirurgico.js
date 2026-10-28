@@ -200,7 +200,64 @@ window.PcpCirurgico=(()=>{
    if((day&&root.contains(day)&&!day.disabled)||detail.contains(event.target))return;
    selectedDay='';renderDetail();
   });
-  return {root,render,periods};
+  const monthlyHost=document.createElement('div');monthlyHost.className='cg-production-monthly';root.lastElementChild.append(monthlyHost);
+  return {root,render,periods,monthlyHost};
+ }
+ function createProductivityMonthly(host,fields,getData,currentMonth=()=>{
+  const parts=new Intl.DateTimeFormat('en',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit'}).formatToParts(new Date());
+  return parts.find(p=>p.type==='year').value+'-'+parts.find(p=>p.type==='month').value;
+ }){
+  host.innerHTML='<p class="cg-production-notice" role="status" aria-live="polite"></p><div class="cg-monthly-scroll" tabindex="0" role="region" aria-label="Acumulado mensal por unidade. Arraste para consultar meses anteriores."></div>';
+  const status=host.querySelector('p'),box=host.querySelector('.cg-monthly-scroll');
+  let lastHTML='',lastPeriods='',columnWidth=145,followLatest=true,pointer=null;
+  function periods(){
+   const now=currentMonth(),yearNow=Number(now.slice(0,4)),monthNow=Number(now.slice(5,7)),selected=PcpMulti.values(fields.Ano.value);
+   const years=[...new Set(selected.length?selected:[...fields.Ano.options].map(o=>o.value))].map(Number).filter(y=>Number.isInteger(y)&&y>=1000&&y<=yearNow).sort((a,b)=>a-b);
+   return years.flatMap(year=>Array.from({length:year===yearNow?monthNow:12},(_,i)=>({year,month:i+1})));
+  }
+  function layout(reset=false,offset=box.scrollLeft/columnWidth){
+   if(!box.clientWidth)return;
+   const table=box.querySelector('table');if(!table)return;
+   const count=periods().length;if(!count)return;
+   const fixed=window.matchMedia('(max-width:767px)').matches?150:250,available=Math.max(120,box.clientWidth-fixed),visible=Math.max(1,Math.min(count,Math.floor(available/145)));
+   columnWidth=Math.max(120,available/visible);
+   table.style.setProperty('--cg-monthly-unit',fixed+'px');table.style.setProperty('--cg-monthly-column',columnWidth+'px');table.style.width=(fixed+count*columnWidth)+'px';
+   if(reset||followLatest){box.scrollLeft=box.scrollWidth;followLatest=true;}
+   else box.scrollLeft=offset*columnWidth;
+  }
+  function resetPosition(){followLatest=true;requestAnimationFrame(()=>layout(true));}
+  function render(){
+   if(host.closest('[hidden]'))return;
+   const data=getData(),months=periods(),groupAllowed=PcpMulti.includes(fields.Grupo.value,'producao'),keys=selectedHeadCompanies(fields.Unidade.value),sums=new Map();
+   if(data.status==='ready'&&groupAllowed&&data.limit){
+    for(const row of data.rows){
+     if(row.data>data.limit||row.quantidade_cabecas==null||!Number.isFinite(row.quantidade_cabecas))continue;
+     const key=row.empresa_codigo+'|'+row.data.slice(0,7);sums.set(key,(sums.get(key)??0)+row.quantidade_cabecas);
+    }
+   }
+   status.textContent=!groupAllowed?'Aves pertencem ao grupo Produção e perdas.':data.status==='loading'?'Consultando acumulados mensais…':data.status==='error'?'Não foi possível consultar o acumulado mensal. Clique em Produtividade para tentar novamente.':'Totais de aves por mês'+(data.limit?' · até '+data.limit.split('-').reverse().join('/')+' (D−1)':'')+'. Mês, Dia e Semana cheia não alteram esta tabela. Arraste para consultar meses anteriores.';
+   const signature=months.map(p=>p.year+'-'+p.month).join(','),reset=signature!==lastPeriods;lastPeriods=signature;
+   if(!months.length){box.innerHTML='<p class="pcp-report-notice">Sem meses disponíveis para o ano selecionado.</p>';lastHTML='';return;}
+   const html='<table class="cg-table cg-monthly-table"><caption class="cg-production-sr">Acumulado mensal de aves por unidade</caption><colgroup><col class="cg-monthly-unit-col">'+months.map(()=>'<col>').join('')+'</colgroup><thead><tr><th scope="col">Unidade</th>'+months.map(({year,month})=>'<th scope="col">'+esc(new Date(Date.UTC(year,month-1,1)).toLocaleDateString('pt-BR',{month:'short',year:'numeric',timeZone:'UTC'}))+'</th>').join('')+'</tr></thead><tbody>'+keys.map(code=>'<tr><th scope="row">'+esc(headCompanies[code])+'</th>'+months.map(({year,month})=>{
+    const value=sums.get(code+'|'+year+'-'+String(month).padStart(2,'0'));
+    return '<td>'+(value==null?'—':esc(value.toLocaleString('pt-BR',{maximumFractionDigits:6}))+' <small>'+(value===1?'ave':'aves')+'</small>')+'</td>';
+   }).join('')+'</tr>').join('')+'</tbody></table>';
+   if(html!==lastHTML){const offset=box.scrollLeft/columnWidth;lastHTML=html;box.innerHTML=html;requestAnimationFrame(()=>layout(reset,offset));}
+   else if(reset)resetPosition();
+  }
+  box.addEventListener('scroll',()=>{followLatest=box.scrollWidth-box.clientWidth-box.scrollLeft<4;},{passive:true});
+  box.addEventListener('pointerdown',event=>{if(event.button!==0||event.pointerType==='touch')return;pointer={id:event.pointerId,x:event.clientX,left:box.scrollLeft,dragging:false};});
+  box.addEventListener('pointermove',event=>{
+   if(!pointer||event.pointerId!==pointer.id)return;
+   if(!(event.buttons&1)){stopDrag();return;}
+   const distance=event.clientX-pointer.x;
+   if(!pointer.dragging&&Math.abs(distance)>4){pointer.dragging=true;box.setPointerCapture(pointer.id);box.classList.add('cg-monthly-dragging');}
+   if(pointer.dragging){event.preventDefault();box.scrollLeft=pointer.left-distance;}
+  });
+  function stopDrag(){if(pointer&&box.hasPointerCapture(pointer.id))box.releasePointerCapture(pointer.id);pointer=null;box.classList.remove('cg-monthly-dragging');}
+  box.addEventListener('pointerup',stopDrag);box.addEventListener('pointercancel',stopDrag);box.addEventListener('lostpointercapture',()=>{pointer=null;box.classList.remove('cg-monthly-dragging');});
+  new ResizeObserver(()=>layout()).observe(box);
+  return {render,periods,resetPosition};
  }
  function mount(){
   const mobile=PcpMobileScroll.active();
@@ -210,6 +267,7 @@ window.PcpCirurgico=(()=>{
   const content=document.getElementById('pcpConteudo');content.className='pcp-report-panels';content.innerHTML='<article class="card pcp-report-panel"><header><h2>Indicadores por dia</h2></header><div id="cgDiario" class="cg-scroll"></div></article><article class="card pcp-report-panel"><header><h2>Acumulado mensal</h2><div hidden><p>Razões calculadas pelos pesos acumulados até D−1. A seleção de dia limita o quadro diário; o acumulado mantém o mês escolhido.</p><p>Condenação: menor ou igual à meta. Demais indicadores: maior ou igual à meta. Ausência de base é apresentada como —.</p></div></header><div id="cgMensal" class="cg-scroll"></div></article>';
   const ids=['Ano','Mes','Dia','Unidade','Grupo'],fields=Object.fromEntries(ids.map(k=>[k,document.getElementById('cg'+k)]));let data=null,generation=0,controller,loading=false;
   let headsState={status:'idle',rows:[]},headsKey='',headsGeneration=0,headsController=null;
+  let monthlyState={status:'idle',rows:[]},monthlyKey='',monthlyGeneration=0,monthlyController=null;
   const indicatorWeekFilter=document.createElement('label');indicatorWeekFilter.className='cg-production-week-filter';indicatorWeekFilter.hidden=true;
   indicatorWeekFilter.innerHTML='<input type="checkbox" id="cgSemanaCheia"><span>Semana cheia</span>';
   fields.SemanaCheia=indicatorWeekFilter.querySelector('input');
@@ -218,6 +276,7 @@ window.PcpCirurgico=(()=>{
   const productivity=createProductivityCalendar(content,fields,({year,month})=>{
    fields.Ano.value=String(year);fields.Mes.value=String(month);fields.Dia.value='';load();
   },()=>loading,()=>headsState);
+  const monthly=createProductivityMonthly(productivity.monthlyHost,fields,()=>monthlyState);
   let indicatorMode='rendimento';
   const indicatorFlags=PcpPeriodFlags.create('cgTipoIndicador',indicatorMode,mode=>{
    indicatorMode=mode;
@@ -225,7 +284,7 @@ window.PcpCirurgico=(()=>{
    indicatorWeekFilter.hidden=mode!=='produtividade';
    productivity.root.hidden=mode!=='produtividade';productivity.render();
    if(mode==='rendimento'){load();requestAnimationFrame(scrollTablesToLatest);}
-   else refreshHeads(true);
+   else{refreshHeads(true);refreshMonthly(true);monthly.resetPosition();}
   },[['rendimento','Rendimento'],['produtividade','Produtividade']]);
   indicatorFlags.setAttribute('aria-label','Tipo de indicador');
   indicatorFlags.querySelector('legend').textContent='Tipo de indicador';
@@ -258,6 +317,25 @@ window.PcpCirurgico=(()=>{
     if(id!==headsGeneration)return;
     headsState={status:'error',rows:[],limit};
    }finally{if(id===headsGeneration){headsController=null;productivity.render();}}
+  }
+  async function refreshMonthly(force=false){
+   const limit=data?.data_limite;
+   if(indicatorMode!=='produtividade'||!PcpMulti.includes(fields.Grupo.value,'producao')||!limit){
+    if(monthlyController){monthlyGeneration++;monthlyController.abort();monthlyController=null;}
+    monthlyKey='';monthlyState={status:limit?'idle':loading?'loading':'error',rows:[],limit};monthly.render();return;
+   }
+   const periods=monthly.periods(),units=fields.Unidade.value,key=JSON.stringify([periods,units,limit]);
+   if(!force&&monthlyKey===key){monthly.render();return;}
+   monthlyKey=key;const id=++monthlyGeneration;monthlyController?.abort();monthlyController=new AbortController();
+   monthlyState={status:'loading',rows:[],limit};monthly.render();
+   try{
+    const rows=await productivityHeads.load(apiGet,periods,units,monthlyController.signal,false,limit);
+    if(id!==monthlyGeneration)return;
+    monthlyState={status:'ready',rows,limit};
+   }catch(e){
+    if(id!==monthlyGeneration)return;
+    monthlyState={status:'error',rows:[],limit};
+   }finally{if(id===monthlyGeneration){monthlyController=null;monthly.render();}}
   }
   const dialog=document.createElement('dialog');dialog.className='cg-dialog';dialog.setAttribute('aria-labelledby','cgGraficoTitulo');dialog.innerHTML='<header class="cg-dialog-header"><div><h2 id="cgGraficoTitulo"></h2><p id="cgGraficoContexto"></p></div><div class="cg-dialog-actions"><button type="button" class="button" id="cgMaximizar" aria-pressed="false">Maximizar</button><button type="button" class="button cg-dialog-close">Fechar</button></div></header><div class="cg-chart-filters"><input type="hidden" id="cgGraficoModo" value="dias"><div id="cgCampoDias"><span>Dias · seleção múltipla</span><div id="cgGraficoDias" class="checkbox-multiselect"></div></div><div id="cgCampoSemanas" class="hidden"><span>Semanas · seleção múltipla</span><div id="cgGraficoSemanas" class="checkbox-multiselect"></div></div><div id="cgCampoUnidades"><span>Unidades · seleção múltipla</span><div id="cgGraficoUnidades" class="checkbox-multiselect"></div></div><button type="button" id="cgGraficoLimpar" class="button">Limpar seleção</button></div><div id="cgGraficoLinhas" class="cg-line-chart" aria-label="Evolução diária do indicador"></div>';document.body.append(dialog);
   const chartEl=dialog.querySelector('.cg-line-chart');let lineChart=null,activeIndicator=null,graphPeriod='',graphUnit='',referenceVisible=true,drilledWeek=null,savedDays=null,visibleWeekRows=[],mobileLinePeriod='';
@@ -312,6 +390,7 @@ window.PcpCirurgico=(()=>{
   const tableObserver=new ResizeObserver(()=>scrollTablesToLatest());for(const id of ['cgDiario','cgMensal'])tableObserver.observe(document.getElementById(id));
   function render(){
    refreshHeads();
+   refreshMonthly();
    productivity.render();
    if(!data)return;const keys=selectedColumns(),rows=data.indicadores.filter(r=>PcpMulti.includes(fields.Grupo.value,r.ordem<=8?'familias':'producao'));
    function table(blocks,monthly){
@@ -324,6 +403,7 @@ window.PcpCirurgico=(()=>{
   async function load(){
    const id=++generation;if(controller)controller.abort();controller=new AbortController();loading=true;
    refreshHeads(true);
+   refreshMonthly();
    productivity.render();
    try{const result=await apiGet('/api/pcp/comparativo/cirurgico-geral',{ano:fields.Ano.value||[...fields.Ano.options].map(o=>o.value).join(','),mes:fields.Mes.value||Array.from({length:12},(_,i)=>i+1).join(',')},{silent:true,signal:controller.signal});if(id!==generation)return;if(!result.ok)throw new Error('Consulta não concluída');data=result;
     fields.Ano.innerHTML=result.anos.map(y=>'<option value="'+y+'">'+y+'</option>').join('');fields.Ano.value=result.ano;fields.Mes.value=result.mes;const day=fields.Dia.value;fields.Dia.innerHTML='<option value="">Todos</option>'+result.dias.map(d=>'<option value="'+d.data+'">'+d.data.split('-').reverse().join('/')+'</option>').join('');fields.Dia.value=PcpMulti.values(day).filter(v=>result.dias.some(d=>d.data===v)).join(',');
@@ -331,7 +411,7 @@ window.PcpCirurgico=(()=>{
    }catch(e){if(id!==generation||e.name==='AbortError')return;if(e.status===401||e.status===403){data=null;lineChart?.clear();if(dialog.open)dialog.close();document.getElementById('cgDiario').replaceChildren();document.getElementById('cgMensal').replaceChildren();}const error=document.getElementById('mensagemErro');error.textContent='Não foi possível atualizar o comparativo. '+(data?'A última consulta permanece visível.':'');error.classList.remove('hidden');}
    finally{if(id===generation){loading=false;productivity.render();}}
   }
-  fields.Ano.onchange=fields.Mes.onchange=()=>{fields.Dia.value='';load();};fields.Dia.onchange=fields.Unidade.onchange=fields.Grupo.onchange=render;document.getElementById('cgLimpar').onclick=()=>{fields.Grupo.value=fields.Unidade.value=fields.Dia.value='';fields.Ano.value=now.getFullYear();fields.Mes.value=now.getMonth()+1;if(indicatorMode==='produtividade')fields.SemanaCheia.checked=false;load();};
+  fields.Ano.onchange=fields.Mes.onchange=()=>{fields.Dia.value='';load();};fields.Dia.onchange=fields.Unidade.onchange=fields.Grupo.onchange=render;document.getElementById('cgLimpar').onclick=()=>{fields.Grupo.value=fields.Unidade.value=fields.Dia.value='';fields.Ano.value=now.getFullYear();fields.Mes.value=now.getMonth()+1;if(indicatorMode==='produtividade'){fields.SemanaCheia.checked=false;monthly.resetPosition();}load();};
   function refreshAutomatically(){if(indicatorMode==='rendimento'&&!document.hidden&&!loading)load();}
   setInterval(refreshAutomatically,60000);document.addEventListener('visibilitychange',refreshAutomatically);PcpMulti.enhance(filter);load();
  }
