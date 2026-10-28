@@ -33,7 +33,7 @@ class Element {
 const document = {
   createElement() {
     const element = new Element();
-    element.children = { '.cg-production-months': new Element(), '.cg-production-detail': new Element() };
+    element.children = { '.cg-production-months': new Element(), '.cg-production-detail': new Element(), '.cg-production-notice': new Element() };
     element.arrows = [-1, 1].map(direction => ({ dataset: { cgMonth: String(direction) } }));
     return element;
   }
@@ -66,7 +66,7 @@ assert.equal(detail.hidden, true);
 calendar.root.clickDay('2024-02-29');
 assert.equal(detail.hidden, false);
 assert.match(detail.innerHTML, /29 de fevereiro de 2024/);
-assert.match(detail.innerHTML, /Nenhum indicador de produtividade disponível/);
+assert.match(detail.innerHTML, /Quantidade de cabeças ainda não consultada/);
 assert.equal(monthHost.buttons.find(b => b.dataset.cgDay === '2024-02-29')['aria-pressed'], 'true');
 render('2023', '2');
 assert.equal(monthHost.buttons.length, 28, 'Fevereiro comum tem 28 dias');
@@ -104,7 +104,7 @@ vm.runInNewContext(integration, {
   content: { children: panels }, fields,
   createProductivityCalendar() { creations++; return { root: productivityRoot, render() {} }; },
   PcpPeriodFlags: { create(id, initial, callback) { assert.equal(initial, 'rendimento'); toggle = callback; return {}; } },
-  requestAnimationFrame: callback => callback(), scrollTablesToLatest: () => scrolls++, load() {}, loading: false
+  requestAnimationFrame: callback => callback(), scrollTablesToLatest: () => scrolls++, load() {}, refreshHeads() {}, loading: false
 });
 const filterState = JSON.stringify(fields);
 for (let attempt = 0; attempt < 3; attempt++) {
@@ -115,4 +115,28 @@ assert.equal(creations, 1, 'Alternância não duplica calendário');
 assert.equal(scrolls, 3);
 assert.equal(JSON.stringify(fields), filterState, 'Alternância preserva filtros');
 assert.deepEqual(panels.map(p => p.innerHTML), ['diário original', 'mensal original']);
+
+// Valores são os mesmos no calendário e no detalhe, sem consolidar empresas.
+let headsState = { status: 'ready', rows: [
+  { data: '2024-02-09', empresa_codigo: '10', empresa: 'Ave Nova', quantidade_cabecas: 108915 },
+  { data: '2024-02-09', empresa_codigo: '111', empresa: 'Real Alimentos', quantidade_cabecas: 80560 }
+] };
+fields.Grupo = { value: '' }; fields.Ano.value = '2024'; fields.Mes.value = '2'; fields.Dia.value = '';
+const filled = create({ prepend() {} }, fields, () => {}, () => false, () => headsState);
+filled.root.hidden = false; filled.render();
+const filledHost = filled.root.children['.cg-production-months'];
+assert.match(filledHost.innerHTML, /Ave Nova<\/span><strong>108\.915/);
+assert.match(filledHost.innerHTML, /Real Alimentos<\/span><strong>80\.560/);
+filled.root.clickDay('2024-02-09');
+const filledDetail = filled.root.children['.cg-production-detail'];
+assert.match(filledDetail.innerHTML, /Ave Nova · Cabeças<\/dt><dd>108\.915/);
+assert.match(filledDetail.innerHTML, /Real Alimentos · Cabeças<\/dt><dd>80\.560/);
+assert.doesNotMatch(filledDetail.innerHTML, /189\.475/);
+filled.root.clickDay('2024-02-10'); assert.match(filledDetail.innerHTML, /Sem registros de Cabeças/);
+fields.Grupo.value = 'familias'; filled.render(); assert.doesNotMatch(filledHost.innerHTML, /108\.915|80\.560/);
+fields.Grupo.value = 'producao'; filled.render(); assert.match(filledHost.innerHTML, /108\.915/);
+headsState = { status: 'loading', rows: [] }; filled.render();
+assert.doesNotMatch(filledHost.innerHTML, /108\.915|80\.560/);
+headsState = { status: 'error', rows: [] }; filled.render();
+assert.match(filledDetail.innerHTML, /Não foi possível consultar Cabeças/);
 console.log('OK: isolamento e alternância, filtros, seleção, navegação, limites de anos, multisseleção e meses de 28/29/30/31 dias.');
