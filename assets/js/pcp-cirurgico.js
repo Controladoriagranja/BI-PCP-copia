@@ -17,7 +17,10 @@ window.PcpCirurgico=(()=>{
   },[['rendimento','Rendimento'],['produtividade','Produtividade']]);
   indicatorFlags.setAttribute('aria-label','Tipo de indicador');
   indicatorFlags.querySelector('legend').textContent='Tipo de indicador';
-  content.querySelector('article>header').append(indicatorFlags);
+  const indicatorToolbar=document.createElement('div');
+  indicatorToolbar.style.cssText='display:flex;justify-content:flex-end;margin-top:12px';
+  indicatorToolbar.append(indicatorFlags);
+  filter.append(indicatorToolbar);
   const dialog=document.createElement('dialog');dialog.className='cg-dialog';dialog.setAttribute('aria-labelledby','cgGraficoTitulo');dialog.innerHTML='<header class="cg-dialog-header"><div><h2 id="cgGraficoTitulo"></h2><p id="cgGraficoContexto"></p></div><div class="cg-dialog-actions"><button type="button" class="button" id="cgMaximizar" aria-pressed="false">Maximizar</button><button type="button" class="button cg-dialog-close">Fechar</button></div></header><div class="cg-chart-filters"><input type="hidden" id="cgGraficoModo" value="dias"><div id="cgCampoDias"><span>Dias · seleção múltipla</span><div id="cgGraficoDias" class="checkbox-multiselect"></div></div><div id="cgCampoSemanas" class="hidden"><span>Semanas · seleção múltipla</span><div id="cgGraficoSemanas" class="checkbox-multiselect"></div></div><div id="cgCampoUnidades"><span>Unidades · seleção múltipla</span><div id="cgGraficoUnidades" class="checkbox-multiselect"></div></div><button type="button" id="cgGraficoLimpar" class="button">Limpar seleção</button></div><div id="cgGraficoLinhas" class="cg-line-chart" aria-label="Evolução diária do indicador"></div>';document.body.append(dialog);
   const chartEl=dialog.querySelector('.cg-line-chart');let lineChart=null,activeIndicator=null,graphPeriod='',graphUnit='',referenceVisible=true,drilledWeek=null,savedDays=null,visibleWeekRows=[],mobileLinePeriod='';
   const graphFields=[{id:'cgGraficoDias',apiKey:'dias',multi:true,search:true},{id:'cgGraficoSemanas',apiKey:'semanas',multi:true,search:true},{id:'cgGraficoUnidades',apiKey:'unidades',multi:true,search:true}],graphMode=dialog.querySelector('#cgGraficoModo');
