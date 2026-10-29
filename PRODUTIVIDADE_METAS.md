@@ -68,6 +68,40 @@ outubro, com o filtro de Abate, está na consulta 5 de
 
 ## Metas e cores
 
+### Peso vivo para rendimento
+
+Após a conferência SQL e a confirmação do usuário de que o valor está em kg,
+a Produtividade também exibe **Peso (kg)** nos dias, no detalhamento, nos
+totais semanais, por dia da semana, do mês/período e no acumulado mensal.
+
+A consulta filtra exclusivamente `descricao = 'Peso Vivo para Rendimento'` e usa
+`quantidade`. `Peso Vivo(-D+A)` e Peso Real são indicadores distintos e não são
+somados ou usados como substitutos. O peso utiliza maior valor por empresa/data/
+turno, sem restringir seção, preservando o histórico de Recepção e evitando contar
+novamente Abate/Compra/Recepção. No calendário A.N. total, soma os maiores valores
+dos dois turnos; selecionar 1T/2T mantém apenas o respectivo turno. R.A. segue seu
+diário comum. O mensal usa os maiores valores diários do diário comum e exibe
+sempre as duas empresas, conforme a regra vigente desse bloco.
+
+| Data | A.N. 1T (kg) | A.N. 2T (kg) | A.N. total/diário (kg) | R.A. diário (kg) |
+|---|---:|---:|---:|---:|
+| 01/10/2026 | 184.709 | 155.157 | 339.866 | 238.560 |
+| 09/10/2026 | 173.396 | 108.605 | 282.001 | 226.798 |
+
+Essas amostras reais foram fornecidas pelo usuário e reproduzidas nos testes.
+Quantidade zero permanece zero; ausência de peso permanece `—`. Peso e Aves têm
+realizações independentes, sem inventar um deles a partir do outro. Os filtros,
+semana cheia e limite D−1 se aplicam ao peso. O peso não recebe meta, diferença
+ou classificação de referência por enquanto; as metas existentes continuam
+exclusivamente em Aves. A aparência segue o tema atual e o alinhamento à direita.
+Usa a API de dados já disponível; nenhum endpoint, tabela ou fórmula de Rendimento
+foi alterado para incluir esse indicador.
+
+Teste dedicado: `node tools/test_pcp_productivity_weight.cjs`. A conferência SQL
+original está em `tools/conferir_peso_vivo_produtividade.sql`.
+
+### Referências de Aves
+
 - Metas lidas exclusivamente dos 18 códigos `PROD_AN_T1_*`, `PROD_AN_T2_*` e `PROD_RA_*`,
   para segunda a sábado, com `tela='calendario_producao_produtividade'` e `ativo=true`.
 - Cada mês usa sua própria `referencia_mes`; nenhuma meta é transportada entre meses.
@@ -277,6 +311,7 @@ Arquivos criados para esta implementação:
 - `tools/reconciliar_produtividade.py`, `tools/conferir_produtividade.sql`.
 - `tools/diagnosticar_turnos_produtividade.sql`, `tools/carga_inicial_metas_produtividade.sql`.
 - `tools/test_produtividade_metas.cjs`, `tools/test_robo_metas_produtividade.py`.
+- `tools/test_pcp_productivity_weight.cjs`, `tools/conferir_peso_vivo_produtividade.sql`.
 - `.env.produtividade.example`, este documento.
 
 Também atualizadas as suítes locais existentes

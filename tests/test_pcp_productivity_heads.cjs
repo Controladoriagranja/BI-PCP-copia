@@ -191,7 +191,7 @@ module.exports = (async () => {
     indicatorMode: 'rendimento', data: { data_limite: '2026-10-27' }, loading: false, fields: { Unidade: { value: '' } },
     productivity: { periods: () => periods, render() {} }, apiGet() {},
     AbortController: class { constructor() { this.signal = { aborted: false }; } abort() { this.signal.aborted = true; } },
-    productivityTargets:{load:async()=>[]},
+    productivityTargets:{load:async()=>[]},productivityWeight:{load:async()=>[]},
     productivityHeads: { load(get, periods, units, signal, fullWeek, limit) { return new Promise((resolve, reject) => pending.push({ resolve, reject, signal, fullWeek, limit })); } }
   };
   const controller = source.slice(source.indexOf('  async function refreshHeads('), source.indexOf('  const dialog='));

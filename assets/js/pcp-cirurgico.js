@@ -54,22 +54,24 @@ window.PcpCirurgico=(()=>{
   }
   function collect(target,rows,columns,params){
    for(const row of rows){
-    if(row[columns.description]!=='Cabeças')continue;
+    if(row[columns.description]!==params.metricDescription)continue;
     // Abate já engloba Recepção + Compra; somar essas seções repetiria as mesmas aves.
-    if(params.somarTurno&&row[columns.section]!=='Abate - Total')continue;
+    if(params.somarTurno&&!params.weight&&row[columns.section]!=='Abate - Total')continue;
     // Empresa é o nome original do relatório; empresa_codigo é metadado da importação.
     const company=headCompany(columns.name&&row[columns.name])||headCompany(row[columns.company]);
     const date=civilDate(row[columns.date]),value=quantity(row[columns.quantity]);
     if(!date||!company||value===null||date<params.inicio||date>params.fim)continue;
     if(params.empresas&&!params.empresas.includes(company))continue;
     if(params.turno&&String(row.turno_codigo)!==params.turno)continue;
-    const key=company+'|'+date,previous=target.get(key),name=headCompanies[company];
+    const key=company+'|'+date,previous=target.get(key),name=headCompanies[company],field=params.weight?'peso_vivo':'quantidade_cabecas';
     if(params.somarTurno){
-     const turnos={...(previous?.turnos||{})};turnos[params.turno]=(turnos[params.turno]??0)+value;
-     target.set(key,{data:date,empresa_codigo:company,empresa:name,quantidade_cabecas:(previous?.quantidade_cabecas??0)+value,turnos});
-    }else if(!previous||value>previous.quantidade_cabecas||(value===previous.quantidade_cabecas&&name<previous.empresa)){
+     const turnos={...(previous?.turnos||{})};
+     turnos[params.turno]=params.weight?Math.max(turnos[params.turno]??-Infinity,value):(turnos[params.turno]??0)+value;
+     const total=params.weight?Object.values(turnos).reduce((sum,number)=>sum+number,0):(previous?.[field]??0)+value;
+     target.set(key,{data:date,empresa_codigo:company,empresa:name,[field]:total,turnos});
+    }else if(!previous||value>previous[field]||(value===previous[field]&&name<previous.empresa)){
      // O diário comum mantém o maior registro por empresa/dia, sem somar seções.
-     target.set(key,{data:date,empresa_codigo:company,empresa:name,quantidade_cabecas:value});
+     target.set(key,{data:date,empresa_codigo:company,empresa:name,[field]:value});
     }
    }
   }
@@ -99,7 +101,7 @@ window.PcpCirurgico=(()=>{
    }
    return result;
   }
-  async function load(get,periods,units,signal,fullWeek=false,dateLimit,totalSource='turnos'){
+  async function load(get,periods,units,signal,fullWeek=false,dateLimit,totalSource='turnos',metricDescription='Cabeças'){
    const limit=civilDate(dateLimit);
    if(!limit)throw Error('Data limite D−1 não confirmada pela consulta do relatório.');
    const ranges=[];
@@ -114,7 +116,8 @@ window.PcpCirurgico=(()=>{
    for(const scope of scopes(units,catalog,totalSource)){
     const columns=schema(catalog,scope.table),{table,empresas,turno,somarTurno}=scope;
     for(const {inicio,fim} of ranges){
-     const params={...(turno?{turno}:{}),...(somarTurno?{[columns.section]:'Abate - Total'}:{}),inicio,fim,[columns.description]:'Cabeças'};
+     const weight=metricDescription==='Peso Vivo para Rendimento';
+     const params={...(turno?{turno}:{}),...(somarTurno&&!weight?{[columns.section]:'Abate - Total'}:{}),inicio,fim,[columns.description]:metricDescription};
      let page=1,expectedTotal=null,received=0;
      do{
       if(signal.aborted)throw new DOMException('Consulta cancelada','AbortError');
@@ -124,7 +127,7 @@ window.PcpCirurgico=(()=>{
       if(result.total!==expectedTotal||result.dados.length>result.tamanho)throw Error('A fonte de Cabeças mudou durante a consulta. Atualize novamente.');
       received+=result.dados.length;
       if(received>expectedTotal||(received<expectedTotal&&result.dados.length!==result.tamanho))throw Error('Paginação de Cabeças incompleta.');
-      collect(target,result.dados,columns,{...params,empresas,somarTurno});
+      collect(target,result.dados,columns,{...params,empresas,somarTurno,weight,metricDescription});
       if(received===expectedTotal)break;
       page++;
      }while(true);
@@ -134,6 +137,7 @@ window.PcpCirurgico=(()=>{
   }
   return {load};
  })();
+ const productivityWeight={load:(get,periods,units,signal,fullWeek,limit,totalSource='turnos')=>productivityHeads.load(get,periods,units,signal,fullWeek,limit,totalSource,'Peso Vivo para Rendimento')};
  const productivityTargets=(()=>{
   const suffix=['','SEG','TER','QUA','QUI','SEX','SAB'];
   const validCode=/^PROD_(AN_T1|AN_T2|RA)_(SEG|TER|QUA|QUI|SEX|SAB)$/;
@@ -187,6 +191,9 @@ window.PcpCirurgico=(()=>{
   const meta=Number.isFinite(rating.meta)?rating.meta:null,difference=Number.isFinite(value)&&meta!=null?value-meta:null;
   const format=number=>number==null?'—':number.toLocaleString('pt-BR',{maximumFractionDigits:6});
   return '<span class="cg-prod-reference"><span><span>Meta</span><span>'+esc(format(meta))+'</span></span><span><span title="Realizado menos meta">Diferença</span><strong'+(difference!=null&&rating.className?' class="'+rating.className+'"':'')+'>'+esc((difference>0?'+':'')+format(difference))+'</strong></span></span>';
+ }
+ function productivityWeightMarkup(value){
+  return '<span class="cg-prod-weight" title="Peso Vivo para Rendimento"><span>Peso (kg)</span><strong>'+esc(Number.isFinite(value)?value.toLocaleString('pt-BR',{maximumFractionDigits:6}):'—')+'</strong></span>';
  }
  const productivityLegend='<div class="cg-prod-legend" aria-label="Referências de produtividade"><span><i class="cg-prod-dot cg-prod-dot-good" aria-hidden="true"></i>Dentro da referência</span><span><i class="cg-prod-dot cg-prod-dot-bad" aria-hidden="true"></i>Fora da referência</span></div>';
  function createProductivityMonthFilter(select,currentMonth=()=>new Intl.DateTimeFormat('en',{timeZone:'America/Sao_Paulo',month:'numeric'}).format(new Date())){
@@ -261,13 +268,14 @@ window.PcpCirurgico=(()=>{
   function dayHeads(date){
    if(getHeads().status!=='ready'||!getHeads().limit||date>getHeads().limit||!PcpMulti.includes(fields.Grupo?.value,'producao'))return [];
    const companies=selectedHeadCompanies(calendarUnit()),rows=getHeads().rows.filter(row=>row.data===date&&companies.includes(row.empresa_codigo));
-   if(!rows.length)return [];
-   return companies.map(code=>rows.find(row=>row.empresa_codigo===code)||{data:date,empresa_codigo:code,empresa:headCompanies[code],quantidade_cabecas:null});
+   const weights=(getHeads().pesos||[]).filter(row=>row.data===date&&companies.includes(row.empresa_codigo));
+   if(!rows.length&&!weights.length)return [];
+   return companies.map(code=>({...rows.find(row=>row.empresa_codigo===code)||{data:date,empresa_codigo:code,empresa:headCompanies[code],quantidade_cabecas:null},peso_vivo:weights.find(row=>row.empresa_codigo===code)?.peso_vivo??null}));
   }
   function headsMarkup(rows){
    return rows.length?'<span class="cg-production-heads">'+rows.map(row=>{
     const rating=productivityTargets.grade(row.empresa_codigo,row._days||[row],getHeads().metas||[],calendarUnit());
-    return '<span><span title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+'</span><strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(formatHeads(rating.meta))+' aves"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+' <small>'+birdUnit(row.quantidade_cabecas)+'</small></strong>'+productivityReferenceMarkup(row.quantidade_cabecas,rating)+'</span>';
+    return '<span><span title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+'</span><strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(formatHeads(rating.meta))+' aves"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+' <small>'+birdUnit(row.quantidade_cabecas)+'</small></strong>'+productivityReferenceMarkup(row.quantidade_cabecas,rating)+productivityWeightMarkup(row.peso_vivo)+'</span>';
    }).join('')+'</span>':'<span class="cg-production-empty" aria-hidden="true">—</span>';
   }
   function totals(dates){
@@ -275,7 +283,8 @@ window.PcpCirurgico=(()=>{
    const daily=dates.filter(date=>date&&PcpMulti.includes(fields.Dia.value,date)).flatMap(dayHeads);
    return selectedHeadCompanies(calendarUnit()).map(code=>{
     const values=daily.filter(row=>row.empresa_codigo===code&&row.quantidade_cabecas!=null).map(row=>row.quantidade_cabecas);
-    return {empresa_codigo:code,empresa:headCompanies[code],quantidade_cabecas:values.length?values.reduce((sum,value)=>sum+value,0):null,_days:daily.filter(row=>row.empresa_codigo===code)};
+    const weights=daily.filter(row=>row.empresa_codigo===code&&row.peso_vivo!=null).map(row=>row.peso_vivo);
+    return {empresa_codigo:code,empresa:headCompanies[code],quantidade_cabecas:values.length?values.reduce((sum,value)=>sum+value,0):null,peso_vivo:weights.length?weights.reduce((sum,value)=>sum+value,0):null,_days:daily.filter(row=>row.empresa_codigo===code)};
    });
   }
   function totalCell(dates,kind,label){
@@ -307,7 +316,7 @@ window.PcpCirurgico=(()=>{
     const date=new Date(selectedDay+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}),rows=dayHeads(selectedDay);
     detail.innerHTML='<header><h2>Detalhamento do dia · '+esc(date)+'</h2></header>'+(rows.length?'<dl class="cg-production-heads-detail">'+rows.map(row=>{
      const rating=productivityTargets.grade(row.empresa_codigo,[row],getHeads().metas||[],calendarUnit());
-     return '<div><dt title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+' · Aves</dt><dd><strong'+(rating.className?' class="'+rating.className+'"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+'</strong>'+productivityReferenceMarkup(row.quantidade_cabecas,rating)+'</dd></div>';
+     return '<div><dt title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+' · Aves</dt><dd><strong'+(rating.className?' class="'+rating.className+'"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+'</strong>'+productivityReferenceMarkup(row.quantidade_cabecas,rating)+productivityWeightMarkup(row.peso_vivo)+'</dd></div>';
     }).join('')+'</dl><p class="cg-production-notice">Valores de aves por empresa e dia, conforme os registros da fonte.</p>':'<p class="cg-production-notice">'+esc(emptyMessage(selectedDay))+'</p>');
    }
    for(const button of monthsHost.querySelectorAll('[data-cg-day]'))button.setAttribute('aria-pressed',String(button.dataset.cgDay===selectedDay));
@@ -326,7 +335,7 @@ window.PcpCirurgico=(()=>{
      if(!date)return '<td class="cg-production-outside" aria-hidden="true"></td>';
      const day=Number(date.slice(8)),outside=date.slice(0,7)!==key,allowed=PcpMulti.includes(fields.Dia.value,date);
      if(allowed)visibleDays.add(date);
-     const rows=allowed?dayHeads(date):[],summary=rows.map(row=>row.empresa+': '+(row.quantidade_cabecas==null?'sem registro':formatHeads(row.quantidade_cabecas)+' '+birdUnit(row.quantidade_cabecas))).join('; ');
+     const rows=allowed?dayHeads(date):[],summary=rows.map(row=>row.empresa+': '+(row.quantidade_cabecas==null?'aves sem registro':formatHeads(row.quantidade_cabecas)+' '+birdUnit(row.quantidade_cabecas))+(row.peso_vivo==null?'':', peso vivo '+formatHeads(row.peso_vivo)+' kg')).join('; ');
      const bothEmpty=state.status==='ready'&&['10','111'].every(code=>(state.rows.find(row=>row.data===date&&row.empresa_codigo===code)?.quantidade_cabecas??0)===0);
      const classes=[outside?'cg-production-adjacent':'',bothEmpty?'cg-production-rest':''].filter(Boolean).join(' ');
      return '<td'+(classes?' class="'+classes+'"':'')+'><button type="button" data-cg-day="'+date+'" aria-pressed="false" aria-label="'+esc(day+' de '+(outside?monthName(Number(date.slice(0,4)),Number(date.slice(5,7))):label)+' · '+(allowed?(summary||emptyMessage(date)):'Fora do filtro de dia'))+'"'+(allowed?'':' disabled')+'><span class="cg-production-day-number">'+day+(outside?'<small>/'+date.slice(5,7)+'</small>':'')+'</span>'+headsMarkup(rows)+'</button></td>';
@@ -379,13 +388,17 @@ window.PcpCirurgico=(()=>{
   function resetPosition(){followLatest=true;requestAnimationFrame(()=>layout(true));}
   function render(){
    if(host.closest('[hidden]'))return;
-   const data=getData(),months=periods(),groupAllowed=PcpMulti.includes(fields.Grupo.value,'producao'),keys=['10','111'],sums=new Map(),dailyRows=new Map();
+   const data=getData(),months=periods(),groupAllowed=PcpMulti.includes(fields.Grupo.value,'producao'),keys=['10','111'],sums=new Map(),dailyRows=new Map(),weights=new Map();
    status.hidden=data.status!=='loading'&&data.status!=='error';
    if(data.status==='ready'&&groupAllowed&&data.limit){
     for(const row of data.rows){
      if(row.data>data.limit||row.quantidade_cabecas==null||!Number.isFinite(row.quantidade_cabecas))continue;
      const key=row.empresa_codigo+'|'+row.data.slice(0,7);sums.set(key,(sums.get(key)??0)+row.quantidade_cabecas);
      if(!dailyRows.has(key))dailyRows.set(key,[]);dailyRows.get(key).push(row);
+    }
+    for(const row of data.pesos||[]){
+     if(row.data>data.limit||!Number.isFinite(row.peso_vivo))continue;
+     const key=row.empresa_codigo+'|'+row.data.slice(0,7);weights.set(key,(weights.get(key)??0)+row.peso_vivo);
     }
    }
    status.textContent=!groupAllowed?'Aves pertencem ao grupo Produção e perdas.':data.status==='loading'?'Consultando acumulados mensais…':data.status==='error'?'Não foi possível consultar o acumulado mensal. Clique em Produtividade para tentar novamente.':'Totais de aves por mês'+(data.limit?' · até '+data.limit.split('-').reverse().join('/')+' (D−1)':'')+'. Mês, Dia e Semana cheia não alteram esta tabela. Arraste para consultar meses anteriores.';
@@ -394,7 +407,7 @@ window.PcpCirurgico=(()=>{
    const html='<table class="cg-table cg-monthly-table"><caption class="cg-production-sr">Acumulado mensal de aves por unidade</caption><colgroup><col class="cg-monthly-unit-col">'+months.map(()=>'<col>').join('')+'</colgroup><thead><tr><th scope="col">Unidade</th>'+months.map(({year,month})=>'<th scope="col">'+esc(new Date(Date.UTC(year,month-1,1)).toLocaleDateString('pt-BR',{month:'short',year:'numeric',timeZone:'UTC'}))+'</th>').join('')+'</tr></thead><tbody>'+keys.map(code=>'<tr><th scope="row">'+esc(headCompanies[code])+'</th>'+months.map(({year,month})=>{
     const value=sums.get(code+'|'+year+'-'+String(month).padStart(2,'0'));
     const rating=productivityTargets.grade(code,dailyRows.get(code+'|'+year+'-'+String(month).padStart(2,'0'))||[],data.metas||[],'');
-    return '<td>'+(value==null?'—':'<strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(rating.meta.toLocaleString('pt-BR'))+' aves"':'')+'>'+esc(value.toLocaleString('pt-BR',{maximumFractionDigits:6}))+'</strong> <small>'+(value===1?'ave':'aves')+'</small>'+productivityReferenceMarkup(value,rating))+'</td>';
+    return '<td>'+(value==null?'—':'<strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(rating.meta.toLocaleString('pt-BR'))+' aves"':'')+'>'+esc(value.toLocaleString('pt-BR',{maximumFractionDigits:6}))+'</strong> <small>'+(value===1?'ave':'aves')+'</small>'+productivityReferenceMarkup(value,rating))+productivityWeightMarkup(weights.get(code+'|'+year+'-'+String(month).padStart(2,'0')))+'</td>';
    }).join('')+'</tr>').join('')+'</tbody></table>';
    if(html!==lastHTML){const offset=box.scrollLeft/columnWidth;lastHTML=html;box.innerHTML=html;requestAnimationFrame(()=>layout(reset,offset));}
    else if(reset)resetPosition();
@@ -471,10 +484,10 @@ window.PcpCirurgico=(()=>{
    headsKey=key;const id=++headsGeneration;headsController?.abort();headsController=new AbortController();
    headsState={status:'loading',rows:[],limit};productivity.render();
    try{
-    const [production,targets]=await Promise.allSettled([productivityHeads.load(apiGet,periods,units,headsController.signal,fullWeek,limit),productivityTargets.load(apiGet,periods,headsController.signal,fullWeek,limit)]);
+    const [production,targets,weight]=await Promise.allSettled([productivityHeads.load(apiGet,periods,units,headsController.signal,fullWeek,limit),productivityTargets.load(apiGet,periods,headsController.signal,fullWeek,limit),productivityWeight.load(apiGet,periods,units,headsController.signal,fullWeek,limit)]);
     if(production.status==='rejected')throw production.reason;
     if(id!==headsGeneration)return;
-    headsState={status:'ready',rows:production.value,metas:targets.status==='fulfilled'?targets.value:[],limit};
+    headsState={status:'ready',rows:production.value,metas:targets.status==='fulfilled'?targets.value:[],pesos:weight.status==='fulfilled'?weight.value:[],pesoStatus:weight.status==='fulfilled'?'ready':'error',limit};
    }catch(e){
     if(id!==headsGeneration)return;
     headsState={status:'error',rows:[],limit};
@@ -491,10 +504,10 @@ window.PcpCirurgico=(()=>{
    monthlyKey=key;const id=++monthlyGeneration;monthlyController?.abort();monthlyController=new AbortController();
    monthlyState={status:'loading',rows:[],limit};monthly.render();
    try{
-    const [production,targets]=await Promise.allSettled([productivityHeads.load(apiGet,periods,units,monthlyController.signal,false,limit,'diario'),productivityTargets.load(apiGet,periods,monthlyController.signal,false,limit)]);
+    const [production,targets,weight]=await Promise.allSettled([productivityHeads.load(apiGet,periods,units,monthlyController.signal,false,limit,'diario'),productivityTargets.load(apiGet,periods,monthlyController.signal,false,limit),productivityWeight.load(apiGet,periods,units,monthlyController.signal,false,limit,'diario')]);
     if(production.status==='rejected')throw production.reason;
     if(id!==monthlyGeneration)return;
-    monthlyState={status:'ready',rows:production.value,metas:targets.status==='fulfilled'?targets.value:[],limit};
+    monthlyState={status:'ready',rows:production.value,metas:targets.status==='fulfilled'?targets.value:[],pesos:weight.status==='fulfilled'?weight.value:[],pesoStatus:weight.status==='fulfilled'?'ready':'error',limit};
    }catch(e){
     if(id!==monthlyGeneration)return;
     monthlyState={status:'error',rows:[],limit};
