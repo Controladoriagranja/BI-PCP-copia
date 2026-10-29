@@ -171,7 +171,7 @@ module.exports = (async () => {
     {data:'2026-10-28',empresa_codigo:'111',empresa:'Real Alimentos',quantidade_cabecas:20064}
   ] };
   const displayed = {
-    getHeads: () => displayedState, fields:{Grupo:{value:''},Unidade:{value:''},Dia:{value:''}},
+    calendarUnit:()=> '10', getHeads: () => displayedState, fields:{Grupo:{value:''},Unidade:{value:''},Dia:{value:''}},
     selectedHeadCompanies: () => ['10','111'], headCompanies:{'10':'Ave Nova','111':'Real Alimentos'},
     PcpMulti:{includes:(value,item) => !value || value.split(',').includes(String(item))}
   };

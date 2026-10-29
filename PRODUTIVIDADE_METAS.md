@@ -14,23 +14,29 @@ WHERE descricao = 'Cabeças'
   AND turno_codigo IN ('1', '2')
 ```
 
-Soma `quantidade` por empresa/data/turno. Todos/Ave Nova mostram a soma dos dois
-turnos em uma única linha A.N.; selecionar 1º ou 2º turno restringe a fonte e a meta.
+Soma `quantidade` por empresa/data/turno. Ave Nova mostra a soma dos dois turnos
+em uma única linha A.N.; selecionar 1º ou 2º turno restringe a fonte e a meta.
 `data_referencia` é a data civil. O limite permanece o `data_limite` D−1 retornado
 pelo relatório, inclusive em semana cheia e no acumulado mensal.
 
-**Acumulado mensal:** por solicitação posterior do usuário, com Todos/Ave Nova,
-o total da A.N. usa `pcp.diario_industria`, selecionando o maior registro de
+**Acumulado mensal:** por solicitação posterior do usuário, sempre exibe Ave Nova
+e Real Alimentos, independentemente da Unidade/turno escolhidos para o calendário.
+O total da A.N. usa `pcp.diario_industria`, selecionando o maior registro de
 Cabeças por empresa/dia e somando esses valores no mês, como antes, sem restringir
 seção. Não há soma entre seções, prioridade de Abate ou complemento de datas por
 outra fonte no mensal geral. O calendário mantém sua seleção de Abate por turnos.
 Metas, diferenças, D−1 e a regra da R.A. são preservados.
 
-Com 1º ou 2º turno selecionado, o mensal consulta o respectivo turno na tabela
-por turnos, mas mantém a regra anterior de `Descrição = 'Cabeças'` e maior
-`Quantidade` por empresa/dia, sem restringir seção. Assim Recepção histórica de
-julho é considerada, sem somar novamente Compra/Recepção ao total de Abate.
-Essa regra foi confirmada pelo usuário após o diagnóstico dos meses ausentes.
+A rotina de leitura preserva a seleção do maior registro de Cabeças por
+empresa/dia, sem restringir seção no diário comum. O mensal não usa a seleção
+de turno do calendário para seus valores ou metas e não repete consultas quando
+apenas essa seleção muda. Ano e Grupo continuam aplicáveis como anteriormente.
+
+**Filtro Unidade do calendário:** seleção única, reutilizando o menu existente.
+Ave Nova é a seleção inicial e volta ao clicar em Limpar filtros; não há opção de
+selecionar todas ou deixar vazio em Produtividade. Trocar para Rendimento restaura
+sua seleção múltipla anterior. O título mostra o mês e a unidade/turno, por exemplo
+`Outubro de 2026 - Ave Nova`. Os valores numéricos do mensal ficam alinhados à direita.
 
 O diagnóstico mostrou que **Recepção + Compra já estão incluídas em Abate - Total**.
 Somar todas essas seções produzia exatamente o dobro nos 23 dias de outubro

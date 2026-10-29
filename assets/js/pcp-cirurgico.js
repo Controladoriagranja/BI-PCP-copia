@@ -220,6 +220,32 @@ window.PcpCirurgico=(()=>{
   }
   return {sync};
  }
+ function createProductivityUnitFilter(select){
+  const allowed=['10','111','1','2'];
+  let active=false,savedUnits='',unit='10',boundHost=null;
+  function sync(mode){
+   const multi=select.pcpMulti,host=multi?.controller.getState(multi.field).host;
+   if(host&&boundHost!==host){
+    boundHost=host;
+    host.addEventListener('change',event=>{
+     if(!active||!event.target.matches('input[type="checkbox"]'))return;
+     event.stopImmediatePropagation();
+     if(event.target.hasAttribute('data-all')||!allowed.includes(String(event.target.value)))return;
+     unit=String(event.target.value);select.value=unit;select.dispatchEvent(new Event('change',{bubbles:true}));
+    },true);
+   }
+   if(mode==='produtividade'){
+    if(!active){savedUnits=select.value;active=true;select.value=unit;multi?.controller.closeAll();}
+    else{
+     const selected=PcpMulti.values(select.value).filter(value=>allowed.includes(value));
+     unit=selected.length===1?selected[0]:selected.includes(unit)?unit:selected[0]||'10';
+     if(select.value!==unit)select.value=unit;
+    }
+   }else if(active){active=false;select.value=savedUnits;multi?.controller.closeAll();}
+   if(host)host.classList.toggle('cg-unit-single',active);
+  }
+  return {sync};
+ }
  function createProductivityCalendar(content,fields,onNavigate,isLoading,getHeads=()=>({status:'idle',rows:[]})){
   const root=document.createElement('section');root.id='cgProdutividade';root.hidden=true;
   root.innerHTML='<article class="card pcp-report-panel"><header class="cg-production-header"><h2>Calendário de Produção</h2><div class="cg-production-header-tools">'+productivityLegend+'<nav aria-label="Navegação do calendário"><button type="button" data-cg-month="-1" aria-label="Mês anterior">←</button><button type="button" data-cg-month="1" aria-label="Próximo mês">→</button></nav></div></header><p class="cg-production-notice">Consultando quantidade de aves…</p><div class="cg-production-months"></div></article><article class="card pcp-report-panel cg-production-detail" hidden aria-live="polite" aria-atomic="true"></article><article class="card pcp-report-panel"><header><h2>Acumulado mensal</h2>'+productivityLegend+'</header></article>';
@@ -230,22 +256,24 @@ window.PcpCirurgico=(()=>{
   let selectedDay='',visibleDays=new Set();
   const formatHeads=value=>value==null?'—':value.toLocaleString('pt-BR',{maximumFractionDigits:6});
   const birdUnit=value=>value===1?'ave':'aves';
+  const calendarUnit=()=>PcpMulti.values(fields.Unidade?.value).find(value=>['10','111','1','2'].includes(value))||'10';
+  const calendarUnitLabel=()=>({'10':'Ave Nova','111':'Real Alimentos','1':'Ave Nova - 1º turno','2':'Ave Nova - 2º turno'}[calendarUnit()]);
   function dayHeads(date){
    if(getHeads().status!=='ready'||!getHeads().limit||date>getHeads().limit||!PcpMulti.includes(fields.Grupo?.value,'producao'))return [];
-   const companies=selectedHeadCompanies(fields.Unidade?.value),rows=getHeads().rows.filter(row=>row.data===date&&companies.includes(row.empresa_codigo));
+   const companies=selectedHeadCompanies(calendarUnit()),rows=getHeads().rows.filter(row=>row.data===date&&companies.includes(row.empresa_codigo));
    if(!rows.length)return [];
    return companies.map(code=>rows.find(row=>row.empresa_codigo===code)||{data:date,empresa_codigo:code,empresa:headCompanies[code],quantidade_cabecas:null});
   }
   function headsMarkup(rows){
    return rows.length?'<span class="cg-production-heads">'+rows.map(row=>{
-    const rating=productivityTargets.grade(row.empresa_codigo,row._days||[row],getHeads().metas||[],fields.Unidade.value);
+    const rating=productivityTargets.grade(row.empresa_codigo,row._days||[row],getHeads().metas||[],calendarUnit());
     return '<span><span title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+'</span><strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(formatHeads(rating.meta))+' aves"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+' <small>'+birdUnit(row.quantidade_cabecas)+'</small></strong>'+productivityReferenceMarkup(row.quantidade_cabecas,rating)+'</span>';
    }).join('')+'</span>':'<span class="cg-production-empty" aria-hidden="true">—</span>';
   }
   function totals(dates){
    if(getHeads().status!=='ready'||!PcpMulti.includes(fields.Grupo?.value,'producao'))return [];
    const daily=dates.filter(date=>date&&PcpMulti.includes(fields.Dia.value,date)).flatMap(dayHeads);
-   return selectedHeadCompanies(fields.Unidade?.value).map(code=>{
+   return selectedHeadCompanies(calendarUnit()).map(code=>{
     const values=daily.filter(row=>row.empresa_codigo===code&&row.quantidade_cabecas!=null).map(row=>row.quantidade_cabecas);
     return {empresa_codigo:code,empresa:headCompanies[code],quantidade_cabecas:values.length?values.reduce((sum,value)=>sum+value,0):null,_days:daily.filter(row=>row.empresa_codigo===code)};
    });
@@ -278,7 +306,7 @@ window.PcpCirurgico=(()=>{
    if(selectedDay){
     const date=new Date(selectedDay+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}),rows=dayHeads(selectedDay);
     detail.innerHTML='<header><h2>Detalhamento do dia · '+esc(date)+'</h2></header>'+(rows.length?'<dl class="cg-production-heads-detail">'+rows.map(row=>{
-     const rating=productivityTargets.grade(row.empresa_codigo,[row],getHeads().metas||[],fields.Unidade.value);
+     const rating=productivityTargets.grade(row.empresa_codigo,[row],getHeads().metas||[],calendarUnit());
      return '<div><dt title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+' · Aves</dt><dd><strong'+(rating.className?' class="'+rating.className+'"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+'</strong>'+productivityReferenceMarkup(row.quantidade_cabecas,rating)+'</dd></div>';
     }).join('')+'</dl><p class="cg-production-notice">Valores de aves por empresa e dia, conforme os registros da fonte.</p>':'<p class="cg-production-notice">'+esc(emptyMessage(selectedDay))+'</p>');
    }
@@ -288,7 +316,7 @@ window.PcpCirurgico=(()=>{
    if(root.hidden)return;
    const notice=root.querySelector('.cg-production-notice'),state=getHeads();
    notice.hidden=state.status!=='loading'&&state.status!=='error';
-   const missing=state.status==='ready'?selectedHeadCompanies(fields.Unidade?.value).filter(code=>!state.rows.some(row=>row.empresa_codigo===code)).map(code=>headCompanies[code]):[];
+   const missing=state.status==='ready'?selectedHeadCompanies(calendarUnit()).filter(code=>!state.rows.some(row=>row.empresa_codigo===code)).map(code=>headCompanies[code]):[];
    const fullWeek=!!fields.SemanaCheia?.checked;
    notice.textContent=(state.status==='ready'&&PcpMulti.includes(fields.Grupo?.value,'producao')?'Aves por empresa e dia.'+(missing.length?' '+missing.join(' e ')+': sem registros de Aves no período consultado.':''):emptyMessage())+(fullWeek?' Semana cheia: os totais incluem os dias dos meses vizinhos exibidos no calendário.':'');
    visibleDays=new Set();
@@ -305,7 +333,7 @@ window.PcpCirurgico=(()=>{
     });
     const weeks=Array.from({length:dates.length/7},(_,week)=>'<tr>'+slots.slice(week*7+1,week*7+7).join('')+totalCell(dates.slice(week*7,week*7+7),'week-'+week,'Total semanal')+'</tr>').join('');
     const footer=weekdays.slice(1).map((day,index)=>totalCell(dates.filter((date,i)=>i%7===index+1),'weekday-'+(index+1),'Total de '+day.toLowerCase())).join('')+totalCell(dates,'month',fullWeek?'Total do período':'Total do mês');
-    return '<div class="cg-production-month"><h3>'+esc(label)+'</h3><div class="cg-production-scroll"><table class="cg-production-grid"><caption class="cg-production-sr">Calendário de Produção · '+esc(label)+'</caption><thead><tr>'+weekdays.slice(1).map(day=>'<th scope="col"><abbr title="'+day+'">'+day.slice(0,3)+'</abbr></th>').join('')+'<th scope="col" title="Total da semana, incluindo os domingos do período.">Total semanal</th></tr></thead><tbody>'+weeks+'</tbody><tfoot><tr>'+footer+'</tr></tfoot></table></div></div>';
+    return '<div class="cg-production-month"><h3>'+esc(label.charAt(0).toUpperCase()+label.slice(1)+' - '+calendarUnitLabel())+'</h3><div class="cg-production-scroll"><table class="cg-production-grid"><caption class="cg-production-sr">Calendário de Produção · '+esc(label)+'</caption><thead><tr>'+weekdays.slice(1).map(day=>'<th scope="col"><abbr title="'+day+'">'+day.slice(0,3)+'</abbr></th>').join('')+'<th scope="col" title="Total da semana, incluindo os domingos do período.">Total semanal</th></tr></thead><tbody>'+weeks+'</tbody><tfoot><tr>'+footer+'</tr></tfoot></table></div></div>';
    }).join('');
    if(!visibleDays.has(selectedDay))selectedDay='';
    renderDetail();
@@ -351,7 +379,7 @@ window.PcpCirurgico=(()=>{
   function resetPosition(){followLatest=true;requestAnimationFrame(()=>layout(true));}
   function render(){
    if(host.closest('[hidden]'))return;
-   const data=getData(),months=periods(),groupAllowed=PcpMulti.includes(fields.Grupo.value,'producao'),keys=selectedHeadCompanies(fields.Unidade.value),sums=new Map(),dailyRows=new Map();
+   const data=getData(),months=periods(),groupAllowed=PcpMulti.includes(fields.Grupo.value,'producao'),keys=['10','111'],sums=new Map(),dailyRows=new Map();
    status.hidden=data.status!=='loading'&&data.status!=='error';
    if(data.status==='ready'&&groupAllowed&&data.limit){
     for(const row of data.rows){
@@ -365,7 +393,7 @@ window.PcpCirurgico=(()=>{
    if(!months.length){box.innerHTML='<p class="pcp-report-notice">Sem meses disponíveis para o ano selecionado.</p>';lastHTML='';return;}
    const html='<table class="cg-table cg-monthly-table"><caption class="cg-production-sr">Acumulado mensal de aves por unidade</caption><colgroup><col class="cg-monthly-unit-col">'+months.map(()=>'<col>').join('')+'</colgroup><thead><tr><th scope="col">Unidade</th>'+months.map(({year,month})=>'<th scope="col">'+esc(new Date(Date.UTC(year,month-1,1)).toLocaleDateString('pt-BR',{month:'short',year:'numeric',timeZone:'UTC'}))+'</th>').join('')+'</tr></thead><tbody>'+keys.map(code=>'<tr><th scope="row">'+esc(headCompanies[code])+'</th>'+months.map(({year,month})=>{
     const value=sums.get(code+'|'+year+'-'+String(month).padStart(2,'0'));
-    const rating=productivityTargets.grade(code,dailyRows.get(code+'|'+year+'-'+String(month).padStart(2,'0'))||[],data.metas||[],fields.Unidade.value);
+    const rating=productivityTargets.grade(code,dailyRows.get(code+'|'+year+'-'+String(month).padStart(2,'0'))||[],data.metas||[],'');
     return '<td>'+(value==null?'—':'<strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(rating.meta.toLocaleString('pt-BR'))+' aves"':'')+'>'+esc(value.toLocaleString('pt-BR',{maximumFractionDigits:6}))+'</strong> <small>'+(value===1?'ave':'aves')+'</small>'+productivityReferenceMarkup(value,rating))+'</td>';
    }).join('')+'</tr>').join('')+'</tbody></table>';
    if(html!==lastHTML){const offset=box.scrollLeft/columnWidth;lastHTML=html;box.innerHTML=html;requestAnimationFrame(()=>layout(reset,offset));}
@@ -393,6 +421,7 @@ window.PcpCirurgico=(()=>{
   const content=document.getElementById('pcpConteudo');content.className='pcp-report-panels';content.innerHTML='<article class="card pcp-report-panel"><header><h2>Indicadores por dia</h2></header><div id="cgDiario" class="cg-scroll"></div></article><article class="card pcp-report-panel"><header><h2>Acumulado mensal</h2><div hidden><p>Razões calculadas pelos pesos acumulados até D−1. A seleção de dia limita o quadro diário; o acumulado mantém o mês escolhido.</p><p>Condenação: menor ou igual à meta. Demais indicadores: maior ou igual à meta. Ausência de base é apresentada como —.</p></div></header><div id="cgMensal" class="cg-scroll"></div></article>';
   const ids=['Ano','Mes','Dia','Unidade','Grupo'],fields=Object.fromEntries(ids.map(k=>[k,document.getElementById('cg'+k)]));let data=null,generation=0,controller,loading=false;
   const monthFilter=createProductivityMonthFilter(fields.Mes);
+  const unitFilter=createProductivityUnitFilter(fields.Unidade);
   let headsState={status:'idle',rows:[]},headsKey='',headsGeneration=0,headsController=null;
   let monthlyState={status:'idle',rows:[]},monthlyKey='',monthlyGeneration=0,monthlyController=null;
   const indicatorWeekFilter=document.createElement('label');indicatorWeekFilter.className='cg-production-week-filter';indicatorWeekFilter.hidden=true;
@@ -410,6 +439,7 @@ window.PcpCirurgico=(()=>{
    for(const option of fields.Unidade.options){if(option.value==='1'||option.value==='2')option.textContent=mode==='produtividade'?'Ave Nova - '+(option.value==='1'?'1º':'2º')+' turno':(option.value==='1'?'1º':'2º')+' turno - AN';}
 
    const monthChanged=monthFilter.sync(mode);
+   unitFilter.sync(mode);
    if(mode==='produtividade'&&monthChanged)fields.Dia.value='';
    for(const panel of yieldPanels)panel.hidden=mode==='produtividade';
    indicatorWeekFilter.hidden=mode!=='produtividade';
@@ -456,7 +486,7 @@ window.PcpCirurgico=(()=>{
     if(monthlyController){monthlyGeneration++;monthlyController.abort();monthlyController=null;}
     monthlyKey='';monthlyState={status:limit?'idle':loading?'loading':'error',rows:[],limit};monthly.render();return;
    }
-   const periods=monthly.periods(),units=fields.Unidade.value,key=JSON.stringify([periods,units,limit]);
+   const periods=monthly.periods(),units='',key=JSON.stringify([periods,units,limit]);
    if(!force&&monthlyKey===key){monthly.render();return;}
    monthlyKey=key;const id=++monthlyGeneration;monthlyController?.abort();monthlyController=new AbortController();
    monthlyState={status:'loading',rows:[],limit};monthly.render();
@@ -523,6 +553,7 @@ window.PcpCirurgico=(()=>{
   const tableObserver=new ResizeObserver(()=>scrollTablesToLatest());for(const id of ['cgDiario','cgMensal'])tableObserver.observe(document.getElementById(id));
   function render(){
    monthFilter.sync(indicatorMode);
+   unitFilter.sync(indicatorMode);
    refreshHeads();
    refreshMonthly();
    productivity.render();
@@ -536,6 +567,7 @@ window.PcpCirurgico=(()=>{
   }
   async function load(){
    monthFilter.sync(indicatorMode);
+   unitFilter.sync(indicatorMode);
    const id=++generation;if(controller)controller.abort();controller=new AbortController();loading=true;
    refreshHeads(true);
    refreshMonthly();
@@ -546,9 +578,9 @@ window.PcpCirurgico=(()=>{
    }catch(e){if(id!==generation||e.name==='AbortError')return;if(e.status===401||e.status===403){data=null;lineChart?.clear();if(dialog.open)dialog.close();document.getElementById('cgDiario').replaceChildren();document.getElementById('cgMensal').replaceChildren();}const error=document.getElementById('mensagemErro');error.textContent='Não foi possível atualizar o comparativo. '+(data?'A última consulta permanece visível.':'');error.classList.remove('hidden');}
    finally{if(id===generation){loading=false;productivity.render();}}
   }
-  fields.Ano.onchange=fields.Mes.onchange=()=>{fields.Dia.value='';load();};fields.Dia.onchange=fields.Unidade.onchange=fields.Grupo.onchange=render;document.getElementById('cgLimpar').onclick=()=>{fields.Grupo.value=fields.Unidade.value=fields.Dia.value='';fields.Ano.value=now.getFullYear();fields.Mes.value=now.getMonth()+1;if(indicatorMode==='produtividade'){fields.SemanaCheia.checked=false;monthly.resetPosition();}load();};
+  fields.Ano.onchange=fields.Mes.onchange=()=>{fields.Dia.value='';load();};fields.Dia.onchange=fields.Unidade.onchange=fields.Grupo.onchange=render;document.getElementById('cgLimpar').onclick=()=>{fields.Grupo.value=fields.Unidade.value=fields.Dia.value='';fields.Ano.value=now.getFullYear();fields.Mes.value=now.getMonth()+1;if(indicatorMode==='produtividade'){fields.Unidade.value='10';fields.SemanaCheia.checked=false;monthly.resetPosition();}load();};
   function refreshAutomatically(){if(indicatorMode==='rendimento'&&!document.hidden&&!loading)load();}
-  setInterval(refreshAutomatically,60000);document.addEventListener('visibilitychange',refreshAutomatically);PcpMulti.enhance(filter);monthFilter.sync(indicatorMode);load();
+  setInterval(refreshAutomatically,60000);document.addEventListener('visibilitychange',refreshAutomatically);PcpMulti.enhance(filter);monthFilter.sync(indicatorMode);unitFilter.sync(indicatorMode);load();
  }
  return {mount};
 })();

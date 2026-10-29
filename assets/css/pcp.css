@@ -477,7 +477,7 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 #cgProdutividade button:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
 #cgProdutividade .cg-production-notice{font-size:12px;line-height:1.6;color:var(--muted-foreground);margin:12px 0}
 #cgProdutividade .cg-production-month+.cg-production-month{margin-top:24px}
-#cgProdutividade h3{font-size:15px;font-weight:650;text-transform:capitalize;margin:14px 0 12px;color:var(--foreground)}
+#cgProdutividade h3{font-size:15px;font-weight:650;margin:14px 0 12px;color:var(--foreground)}
 #cgProdutividade .cg-production-month>h3{margin-top:6px;margin-bottom:10px}
 #cgProdutividade .cg-production-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
 #cgProdutividade .cg-production-grid{width:100%;min-width:800px;table-layout:fixed;border-collapse:collapse;font-size:12px}
@@ -503,6 +503,7 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 #cgProdutividade .cg-production-heads small{font-size:10px;font-weight:400;color:var(--muted-foreground)}
 #cgProdutividade .cg-prod-reference{display:grid;flex-basis:100%;gap:3px;margin-top:3px;font-size:10px;line-height:1.35;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
 #cgProdutividade .cg-prod-reference>span{display:flex;align-items:baseline;justify-content:space-between;gap:4px}
+#cgProdutividade .cg-prod-reference>span>:last-child{text-align:right}
 #cgProdutividade .cg-prod-reference strong{font-size:10px;font-weight:650}
 #cgProdutividade .cg-production-heads-detail .cg-prod-reference{max-width:230px}
 #cgProdutividade .cg-production-heads-detail{display:grid;gap:12px;margin:16px 0}
@@ -518,6 +519,7 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 .pcp-report[data-page="report-g8"] .cg-filter-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;flex:1 1 350px;min-width:0;min-height:36px;gap:12px}
 .pcp-report[data-page="report-g8"] #cgLimpar{background:var(--card);border-color:var(--border);color:var(--foreground)}
 .pcp-report[data-page="report-g8"] #cgMesMulti.cg-month-single .checkbox-option-all{display:none}
+.pcp-report[data-page="report-g8"] #cgUnidadeMulti.cg-unit-single .checkbox-option-all{display:none}
 
 /* Acumulado de Produtividade: mesma tabela do Rendimento, com unidade fixa e meses roláveis. */
 #cgProdutividade .cg-production-monthly{margin-top:10px}
@@ -525,6 +527,7 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 #cgProdutividade .cg-monthly-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #cgProdutividade .cg-monthly-dragging{cursor:grabbing;user-select:none}
 #cgProdutividade .cg-monthly-table{table-layout:fixed}
+#cgProdutividade .cg-monthly-table td{text-align:right}
 #cgProdutividade .cg-monthly-table col{width:var(--cg-monthly-column,145px)}
 #cgProdutividade .cg-monthly-table .cg-monthly-unit-col{width:var(--cg-monthly-unit,250px)}
 #cgProdutividade .cg-monthly-table tbody tr>th:first-child,#cgProdutividade .cg-monthly-table thead tr:first-child>th:first-child{width:var(--cg-monthly-unit,250px);min-width:var(--cg-monthly-unit,250px);max-width:var(--cg-monthly-unit,250px)}
