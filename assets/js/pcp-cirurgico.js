@@ -253,6 +253,12 @@ window.PcpCirurgico=(()=>{
   }
   return {sync};
  }
+ // Nova modificação de 29/10/2026: peso ao lado do dia, sem alterar valores.
+ function productivityDayHeader(day,date,outside,rows){
+  const badge='<span class="cg-production-day-number">'+esc(String(day))+(outside?'<small>/'+esc(date.slice(5,7))+'</small>':'')+'</span>';
+  const weights=rows.map(row=>'<span class="cg-production-day-weight" title="Peso Vivo para Rendimento · '+esc(row.empresa||'')+'"><span>'+(rows.length>1?esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+' · ':'')+'Peso (kg)</span><strong>'+esc(Number.isFinite(row.peso_vivo)?row.peso_vivo.toLocaleString('pt-BR',{maximumFractionDigits:6}):'—')+'</strong></span>').join('');
+  return '<span class="cg-production-day-header">'+badge+(weights?'<span class="cg-production-day-weights">'+weights+'</span>':'')+'</span>';
+ }
  function createProductivityCalendar(content,fields,onNavigate,isLoading,getHeads=()=>({status:'idle',rows:[]})){
   const root=document.createElement('section');root.id='cgProdutividade';root.hidden=true;
   root.innerHTML='<article class="card pcp-report-panel"><header class="cg-production-header"><h2>Calendário de Produção</h2><div class="cg-production-header-tools">'+productivityLegend+'<nav aria-label="Navegação do calendário"><button type="button" data-cg-month="-1" aria-label="Mês anterior">←</button><button type="button" data-cg-month="1" aria-label="Próximo mês">→</button></nav></div></header><p class="cg-production-notice">Consultando quantidade de aves…</p><div class="cg-production-months"></div></article><article class="card pcp-report-panel cg-production-detail" hidden aria-live="polite" aria-atomic="true"></article><article class="card pcp-report-panel"><header><h2>Acumulado mensal</h2>'+productivityLegend+'</header></article>';
@@ -272,10 +278,10 @@ window.PcpCirurgico=(()=>{
    if(!rows.length&&!weights.length)return [];
    return companies.map(code=>({...rows.find(row=>row.empresa_codigo===code)||{data:date,empresa_codigo:code,empresa:headCompanies[code],quantidade_cabecas:null},peso_vivo:weights.find(row=>row.empresa_codigo===code)?.peso_vivo??null}));
   }
-  function headsMarkup(rows){
+  function headsMarkup(rows,showWeight=true){
    return rows.length?'<span class="cg-production-heads">'+rows.map(row=>{
     const rating=productivityTargets.grade(row.empresa_codigo,row._days||[row],getHeads().metas||[],calendarUnit());
-    return '<span><span title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+'</span><strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(formatHeads(rating.meta))+' aves"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+' <small>'+birdUnit(row.quantidade_cabecas)+'</small></strong>'+productivityReferenceMarkup(row.quantidade_cabecas,rating)+productivityWeightMarkup(row.peso_vivo)+'</span>';
+    return '<span><span title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+'</span><strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(formatHeads(rating.meta))+' aves"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+' <small>'+birdUnit(row.quantidade_cabecas)+'</small></strong>'+productivityReferenceMarkup(row.quantidade_cabecas,rating)+(showWeight?productivityWeightMarkup(row.peso_vivo):'')+'</span>';
    }).join('')+'</span>':'<span class="cg-production-empty" aria-hidden="true">—</span>';
   }
   function totals(dates){
@@ -338,7 +344,7 @@ window.PcpCirurgico=(()=>{
      const rows=allowed?dayHeads(date):[],summary=rows.map(row=>row.empresa+': '+(row.quantidade_cabecas==null?'aves sem registro':formatHeads(row.quantidade_cabecas)+' '+birdUnit(row.quantidade_cabecas))+(row.peso_vivo==null?'':', peso vivo '+formatHeads(row.peso_vivo)+' kg')).join('; ');
      const bothEmpty=state.status==='ready'&&['10','111'].every(code=>(state.rows.find(row=>row.data===date&&row.empresa_codigo===code)?.quantidade_cabecas??0)===0);
      const classes=[outside?'cg-production-adjacent':'',bothEmpty?'cg-production-rest':''].filter(Boolean).join(' ');
-     return '<td'+(classes?' class="'+classes+'"':'')+'><button type="button" data-cg-day="'+date+'" aria-pressed="false" aria-label="'+esc(day+' de '+(outside?monthName(Number(date.slice(0,4)),Number(date.slice(5,7))):label)+' · '+(allowed?(summary||emptyMessage(date)):'Fora do filtro de dia'))+'"'+(allowed?'':' disabled')+'><span class="cg-production-day-number">'+day+(outside?'<small>/'+date.slice(5,7)+'</small>':'')+'</span>'+headsMarkup(rows)+'</button></td>';
+     return '<td'+(classes?' class="'+classes+'"':'')+'><button type="button" data-cg-day="'+date+'" aria-pressed="false" aria-label="'+esc(day+' de '+(outside?monthName(Number(date.slice(0,4)),Number(date.slice(5,7))):label)+' · '+(allowed?(summary||emptyMessage(date)):'Fora do filtro de dia'))+'"'+(allowed?'':' disabled')+'>'+productivityDayHeader(day,date,outside,rows)+headsMarkup(rows,false)+'</button></td>';
     });
     const weeks=Array.from({length:dates.length/7},(_,week)=>'<tr>'+slots.slice(week*7+1,week*7+7).join('')+totalCell(dates.slice(week*7,week*7+7),'week-'+week,'Total semanal')+'</tr>').join('');
     const footer=weekdays.slice(1).map((day,index)=>totalCell(dates.filter((date,i)=>i%7===index+1),'weekday-'+(index+1),'Total de '+day.toLowerCase())).join('')+totalCell(dates,'month',fullWeek?'Total do período':'Total do mês');
@@ -379,7 +385,7 @@ window.PcpCirurgico=(()=>{
    if(!box.clientWidth)return;
    const table=box.querySelector('table');if(!table)return;
    const count=periods().length;if(!count)return;
-   const fixed=window.matchMedia('(max-width:767px)').matches?150:250,available=Math.max(120,box.clientWidth-fixed),visible=Math.max(1,Math.min(count,Math.floor(available/145)));
+   const fixed=window.matchMedia('(max-width:767px)').matches||box.clientWidth<600?150:250,available=Math.max(120,box.clientWidth-fixed),visible=Math.max(1,Math.min(count,Math.floor(available/145)));
    columnWidth=Math.max(120,available/visible);
    table.style.setProperty('--cg-monthly-unit',fixed+'px');table.style.setProperty('--cg-monthly-column',columnWidth+'px');table.style.width=(fixed+count*columnWidth)+'px';
    if(reset||followLatest){box.scrollLeft=box.scrollWidth;followLatest=true;}

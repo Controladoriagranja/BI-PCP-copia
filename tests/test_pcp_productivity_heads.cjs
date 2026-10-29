@@ -175,7 +175,7 @@ module.exports = (async () => {
     selectedHeadCompanies: () => ['10','111'], headCompanies:{'10':'Ave Nova','111':'Real Alimentos'},
     PcpMulti:{includes:(value,item) => !value || value.split(',').includes(String(item))}
   };
-  const dailyCode = source.slice(source.indexOf('  function dayHeads(date){'), source.indexOf('  function headsMarkup(rows){'));
+  const dailyCode = source.slice(source.indexOf('  function dayHeads(date){'), source.indexOf('  function headsMarkup('));
   const totalCode = source.slice(source.indexOf('  function totals(dates){'), source.indexOf('  function totalCell(dates,kind,label){'));
   vm.runInNewContext(dailyCode + totalCode, displayed);
   assert.equal(displayed.dayHeads('2026-10-28').length, 0);
