@@ -82,7 +82,7 @@ window.PcpCirurgico=(()=>{
    if(aveNova&&!commonAveNova){
     schema(catalog,'diario_industria_turnos');
     const turnos=!selected.length||selected.includes('10')?['1','2']:selected.filter(key=>key==='1'||key==='2');
-    for(const turno of turnos)result.push({table:'diario_industria_turnos',empresas:['10'],turno,somarTurno:true});
+    for(const turno of turnos)result.push({table:'diario_industria_turnos',empresas:['10'],turno,somarTurno:totalSource!=='diario'});
    }
    // Os relatórios diários podem estar separados entre Diário da indústria e Dados gerais.
    // Uma fonte complementar só é usada se o catálogo confirmar as mesmas colunas.
