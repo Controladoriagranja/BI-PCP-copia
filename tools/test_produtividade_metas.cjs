@@ -62,6 +62,30 @@ module.exports=(async()=>{
  assert.deepEqual(Array.from(await load('1'),r=>r.quantidade_cabecas),[63393,58363,63804]);
  assert.deepEqual(Array.from(await load('2'),r=>r.quantidade_cabecas),[51009,45111]);
  assert.deepEqual(Array.from(await load('111'),r=>r.quantidade_cabecas),[80560]);
+ // O total mensal volta ao diário comum, inclusive onde não existe histórico por turno.
+ const historyCalls=[];
+ const historyGet=async(endpoint,params)=>{
+  if(endpoint==='/api/pcp/tabelas')return catalog;
+  const table=endpoint.split('/').pop();historyCalls.push(table);
+  if(table==='diario_industria_turnos')return get(endpoint,params);
+  const real={data_referencia:'2026-10-09',empresa:'Real Alimentos',empresa_codigo:'111',descricao:'Cabeças',quantidade:table==='dados_gerais'?80500:80560};
+  const dados=table==='dados_gerais'?[real]:[
+   raw('2026-01-02','0','Abate - Total',100),raw('2026-01-02','0','Recepção de Aves Vivas',100),
+   raw('2026-01-03','0','Abate - Total',200),raw('2026-02-02','0','Abate - Total',300),
+   raw('2026-10-01','0','Abate - Total',114402),raw('2026-10-29','0','Abate - Total',999999),real
+  ];
+  return {ok:true,tabela:table,pagina:1,tamanho:1000,total:dados.length,dados};
+ };
+ const historyPeriods=[{year:2026,month:1},{year:2026,month:2},{year:2026,month:10}];
+ const monthly=await heads.load(historyGet,historyPeriods,'',{aborted:false},false,'2026-10-28','diario');
+ const historyAN=monthly.filter(r=>r.empresa_codigo==='10');
+ assert.deepEqual(Array.from(historyAN,r=>r.quantidade_cabecas),[100,200,300,114402]);
+ assert.equal(historyAN.filter(r=>r.data.startsWith('2026-01')).reduce((sum,r)=>sum+r.quantidade_cabecas,0),300,'Janeiro recuperado do diário comum sem duplicar seções');
+ assert.equal(historyCalls.includes('diario_industria_turnos'),false,'Total mensal não depende do histórico de turnos');
+ assert.equal(monthly.find(r=>r.empresa_codigo==='111').quantidade_cabecas,80560);
+ const monthlyTurn=await heads.load(historyGet,historyPeriods,'1',{aborted:false},false,'2026-10-28','diario');
+ assert.deepEqual(Array.from(monthlyTurn,r=>r.quantidade_cabecas),[63393,58363,63804],'Seleção explícita de turno continua respeitando o turno');
+ console.log('OK: mensal total usa diário comum, recupera meses anteriores, preserva MAX diário e D−1; calendário e filtro explícito de turno usam a fonte por turnos.');
  const day1=all.find(r=>r.data==='2026-10-01'&&r.empresa_codigo==='10');
  assert.equal(targets.grade('10',[day1],metas,'').meta,110000);
  assert.equal(targets.grade('10',[day1],metas,'').className,'cg-prod-good');

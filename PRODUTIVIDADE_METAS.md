@@ -6,7 +6,7 @@ alteradas. Data da conferência: **29/10/2026**, fuso America/Sao_Paulo.
 
 ## Regra da fonte, confirmada com os resultados SQL enviados
 
-Ave Nova usa `pcp.diario_industria_turnos`, com:
+No calendário, Ave Nova usa `pcp.diario_industria_turnos`, com:
 
 ```sql
 WHERE descricao = 'Cabeças'
@@ -18,6 +18,14 @@ Soma `quantidade` por empresa/data/turno. Todos/Ave Nova mostram a soma dos dois
 turnos em uma única linha A.N.; selecionar 1º ou 2º turno restringe a fonte e a meta.
 `data_referencia` é a data civil. O limite permanece o `data_limite` D−1 retornado
 pelo relatório, inclusive em semana cheia e no acumulado mensal.
+
+**Acumulado mensal:** por solicitação posterior do usuário, com Todos/Ave Nova,
+o total da A.N. voltou a `pcp.diario_industria`, selecionando o maior registro de
+Cabeças por empresa/dia e somando esses valores no mês, como antes. Essa consulta
+recupera o histórico disponível no diário comum, independentemente da cobertura
+da tabela por turnos. O calendário continua por turnos. Selecionar explicitamente
+1º/2º turno mantém o recorte por turno também no mensal, sem atribuir um total
+diário comum a um turno. Metas, diferenças, D−1 e a regra da R.A. são preservados.
 
 O diagnóstico mostrou que **Recepção + Compra já estão incluídas em Abate - Total**.
 Somar todas essas seções produzia exatamente o dobro nos 23 dias de outubro

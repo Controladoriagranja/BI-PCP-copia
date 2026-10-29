@@ -68,36 +68,38 @@ window.PcpCirurgico=(()=>{
      const turnos={...(previous?.turnos||{})};turnos[params.turno]=(turnos[params.turno]??0)+value;
      target.set(key,{data:date,empresa_codigo:company,empresa:name,quantidade_cabecas:(previous?.quantidade_cabecas??0)+value,turnos});
     }else if(!previous||value>previous.quantidade_cabecas||(value===previous.quantidade_cabecas&&name<previous.empresa)){
-     // A Real Alimentos mantém a seleção atual do maior registro por empresa/dia.
+     // O diário comum mantém o maior registro por empresa/dia, sem somar seções.
      target.set(key,{data:date,empresa_codigo:company,empresa:name,quantidade_cabecas:value});
     }
    }
   }
-  function scopes(units,catalog){
+  function scopes(units,catalog,totalSource){
    const selected=PcpMulti.values(units);
    const result=[];
    const aveNova=!selected.length||selected.some(key=>key==='10'||key==='1'||key==='2');
    const real=!selected.length||selected.includes('111');
-   if(aveNova){
+   const commonAveNova=aveNova&&totalSource==='diario'&&(!selected.length||selected.includes('10'));
+   if(aveNova&&!commonAveNova){
     schema(catalog,'diario_industria_turnos');
     const turnos=!selected.length||selected.includes('10')?['1','2']:selected.filter(key=>key==='1'||key==='2');
     for(const turno of turnos)result.push({table:'diario_industria_turnos',empresas:['10'],turno,somarTurno:true});
    }
    // Os relatórios diários podem estar separados entre Diário da indústria e Dados gerais.
    // Uma fonte complementar só é usada se o catálogo confirmar as mesmas colunas.
-   if(real){
-    const companies=['111'];
+   if(real||commonAveNova){
+    const companies=[...(commonAveNova?['10']:[]),...(real?['111']:[])];
     const realStart=result.length;
     const daily=catalog.tabelas.some(t=>t.tabela==='diario_industria');
+    if(commonAveNova&&!daily)throw Error('Diário comum da Ave Nova não disponível no catálogo PCP.');
     if(daily){schema(catalog,'diario_industria');result.push({table:'diario_industria',empresas:companies});}
-    if(catalog.tabelas.some(t=>t.tabela==='dados_gerais')){
-     try{schema(catalog,'dados_gerais');result.push({table:'dados_gerais',empresas:companies});}catch(e){if(!daily)throw e;}
+    if(real&&catalog.tabelas.some(t=>t.tabela==='dados_gerais')){
+     try{schema(catalog,'dados_gerais');result.push({table:'dados_gerais',empresas:['111']});}catch(e){if(!daily)throw e;}
     }
     if(result.length===realStart)throw Error('Fonte diária de Cabeças não disponível no catálogo PCP.');
    }
    return result;
   }
-  async function load(get,periods,units,signal,fullWeek=false,dateLimit){
+  async function load(get,periods,units,signal,fullWeek=false,dateLimit,totalSource='turnos'){
    const limit=civilDate(dateLimit);
    if(!limit)throw Error('Data limite D−1 não confirmada pela consulta do relatório.');
    const ranges=[];
@@ -109,7 +111,7 @@ window.PcpCirurgico=(()=>{
    const catalog=await get(APP_CONFIG.endpoints.modelo,{}, {silent:true,signal});
    if(!catalog.ok||!Array.isArray(catalog.tabelas))throw Error('Catálogo PCP indisponível.');
    const target=new Map();
-   for(const scope of scopes(units,catalog)){
+   for(const scope of scopes(units,catalog,totalSource)){
     const columns=schema(catalog,scope.table),{table,empresas,turno,somarTurno}=scope;
     for(const {inicio,fim} of ranges){
      const params={...(turno?{turno}:{}),...(somarTurno?{[columns.section]:'Abate - Total'}:{}),inicio,fim,[columns.description]:'Cabeças'};
@@ -459,7 +461,7 @@ window.PcpCirurgico=(()=>{
    monthlyKey=key;const id=++monthlyGeneration;monthlyController?.abort();monthlyController=new AbortController();
    monthlyState={status:'loading',rows:[],limit};monthly.render();
    try{
-    const [production,targets]=await Promise.allSettled([productivityHeads.load(apiGet,periods,units,monthlyController.signal,false,limit),productivityTargets.load(apiGet,periods,monthlyController.signal,false,limit)]);
+    const [production,targets]=await Promise.allSettled([productivityHeads.load(apiGet,periods,units,monthlyController.signal,false,limit,'diario'),productivityTargets.load(apiGet,periods,monthlyController.signal,false,limit)]);
     if(production.status==='rejected')throw production.reason;
     if(id!==monthlyGeneration)return;
     monthlyState={status:'ready',rows:production.value,metas:targets.status==='fulfilled'?targets.value:[],limit};
