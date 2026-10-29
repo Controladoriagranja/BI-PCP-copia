@@ -113,32 +113,34 @@ window.PcpCirurgico=(()=>{
   return {load};
  })();
  function createProductivityMonthFilter(select,currentMonth=()=>new Intl.DateTimeFormat('en',{timeZone:'America/Sao_Paulo',month:'numeric'}).format(new Date())){
-  const single=document.createElement('select');single.id='cgMesProdutividade';single.dataset.pcpMulti='single';single.hidden=true;single.innerHTML=select.innerHTML;
-  single.setAttribute('aria-label','Mês do calendário de Produtividade');select.after(single);
-  let active=false,savedMonths='',month='';
+  let active=false,savedMonths='',month='',boundHost=null;
   const values=()=>PcpMulti.values(select.value).map(Number).filter(n=>Number.isInteger(n)&&n>=1&&n<=12).map(String);
   const choose=list=>list.length===1?list[0]:list.includes(currentMonth())?currentMonth():list.length?String(Math.max(...list.map(Number))):currentMonth();
   function sync(mode){
    const previous=select.value;
    const multi=select.pcpMulti,host=multi?.controller.getState(multi.field).host;
+   if(host&&boundHost!==host){
+    boundHost=host;
+    host.addEventListener('change',event=>{
+     if(!active||!event.target.matches('input[type="checkbox"]'))return;
+     event.stopImmediatePropagation();
+     if(event.target.hasAttribute('data-all'))return;
+     const chosen=Number(event.target.value);
+     if(!Number.isInteger(chosen)||chosen<1||chosen>12)return;
+     month=String(chosen);select.value=month;select.dispatchEvent(new Event('change',{bubbles:true}));
+    },true);
+   }
    if(mode==='produtividade'){
     const selected=values();
     if(!active){savedMonths=select.value;month=choose(selected);active=true;multi?.controller.closeAll();}
     else if(selected.length===1)month=selected[0];
     if(select.value!==month)select.value=month;
-    single.value=month;single.hidden=false;if(host)host.hidden=true;
    }else{
     if(active){active=false;select.value=savedMonths;multi?.controller.closeAll();}
-    single.hidden=true;if(host)host.hidden=false;
    }
+   if(host){host.hidden=false;host.classList.toggle('cg-month-single',active);}
    return previous!==select.value;
   }
-  single.addEventListener('change',()=>{
-   if(!active)return;
-   const chosen=Number(single.value);
-   if(!Number.isInteger(chosen)||chosen<1||chosen>12){sync('produtividade');return;}
-   month=String(chosen);select.value=month;select.dispatchEvent(new Event('change',{bubbles:true}));
-  });
   return {sync};
  }
  function createProductivityCalendar(content,fields,onNavigate,isLoading,getHeads=()=>({status:'idle',rows:[]})){
