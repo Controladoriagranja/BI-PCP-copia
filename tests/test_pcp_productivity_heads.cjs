@@ -20,14 +20,14 @@ const rawHeads = context.window.PcpCirurgico.productivityHeads;
 // Cada cenário informa um limite de dados; os históricos usam um limite posterior às suas datas fictícias.
 const heads = { load: (get, periods, units, signal, fullWeek = false, limit = '2099-12-31') => rawHeads.load(get, periods, units, signal, fullWeek, limit) };
 const table = name => ({ tabela: name,
-  colunas: { descricao: 'text', quantidade: 'double precision', data_referencia: 'date', empresa_codigo: 'text', empresa: 'text', turno_codigo: 'text' },
+  colunas: { secao:'text', descricao: 'text', quantidade: 'double precision', data_referencia: 'date', empresa_codigo: 'text', empresa: 'text', turno_codigo: 'text' },
   mapeamento: [{ coluna: 'descricao', nome_original: 'Descrição' }, { coluna: 'quantidade', nome_original: 'Quantidade' }]
 });
 const catalog = { ok: true, tabelas: [table('diario_industria'), table('diario_industria_turnos')] };
 const row = (quantity, company = '10', overrides = {}) => ({
   data_referencia: '2026-10-09', empresa_codigo: company,
   empresa: company === '10' ? 'Ave Nova' : 'Real Alimentos',
-  descricao: 'Cabeças', quantidade: quantity, indicador: 'Recepção de Aves Vivas', ...overrides
+  secao:'Abate - Total', descricao: 'Cabeças', turno_codigo: '1', quantidade: quantity, indicador: 'Recepção de Aves Vivas', ...overrides
 });
 const records = [
   row(69414), row(39501, '10', { indicador: 'Abate - Total' }),
@@ -59,9 +59,9 @@ module.exports = (async () => {
   const all = api();
   const result = plain(await heads.load(all.get, periods, '', signal));
   assert.deepEqual(result, [
-    { data: '2026-10-09', empresa_codigo: '10', empresa: 'Ave Nova', quantidade_cabecas: 108915 },
+    { data: '2026-10-09', empresa_codigo: '10', empresa: 'Ave Nova', quantidade_cabecas: 267830, turnos: {1:267830} },
     { data: '2026-10-09', empresa_codigo: '111', empresa: 'Real Alimentos', quantidade_cabecas: 80560 },
-    { data: '2026-10-10', empresa_codigo: '10', empresa: 'Ave Nova', quantidade_cabecas: 0 }
+    { data: '2026-10-10', empresa_codigo: '10', empresa: 'Ave Nova', quantidade_cabecas: 0, turnos: {1:0} }
   ]);
   assert.equal(new Set(result.map(r => r.empresa_codigo + r.data)).size, result.length);
   assert.ok(all.calls.filter(c => c.params.pagina).length > 1);
@@ -73,9 +73,9 @@ module.exports = (async () => {
   assert.deepEqual(shifted.map(r => [r.empresa_codigo, r.quantidade_cabecas]), [['10', 69414], ['111', 80560]]);
   assert.ok(shifts.calls.some(c => c.endpoint.endsWith('diario_industria_turnos') && c.params.turno === '1'));
   const bothShifts = api([row(69414, '10', { turno_codigo: '1' }), row(39501, '10', { turno_codigo: '2' })]);
-  assert.equal((await heads.load(bothShifts.get, periods, '1,2', signal))[0].quantidade_cabecas, 69414);
+  assert.equal((await heads.load(bothShifts.get, periods, '1,2', signal))[0].quantidade_cabecas, 108915);
   const lastPage = api([row(1), row(2), row(108915)]);
-  assert.equal((await heads.load(lastPage.get, periods, '10', signal))[0].quantidade_cabecas, 108915);
+  assert.equal((await heads.load(lastPage.get, periods, '10', signal))[0].quantidade_cabecas, 108918);
   const empty = api([]); assert.deepEqual(plain(await heads.load(empty.get, periods, '', signal)), []);
 
   // Empresa original é respeitada mesmo quando os metadados possuem outros códigos.
@@ -97,7 +97,7 @@ module.exports = (async () => {
     return { ok: true, tabela: sourceTable, total: dados.length, pagina: 1, tamanho: 1000, dados };
   };
   assert.deepEqual(plain(await heads.load(splitSources, periods, '', signal)).map(r => [r.empresa_codigo, r.quantidade_cabecas]), [['10', 108915], ['111', 80560]]);
-  assert.deepEqual(sourceCalls, ['diario_industria', 'dados_gerais']);
+  assert.deepEqual(sourceCalls, ['diario_industria_turnos','diario_industria_turnos','diario_industria', 'dados_gerais']);
   assert.deepEqual(plain(await heads.load(splitSources, periods, '10', signal)).map(r => r.empresa_codigo), ['10']);
   assert.deepEqual(plain(await heads.load(splitSources, periods, '111', signal)).map(r => r.empresa_codigo), ['111']);
 
@@ -114,15 +114,16 @@ module.exports = (async () => {
   const renamed = structuredClone(catalog);
   renamed.tabelas[0].colunas.descricao_real = renamed.tabelas[0].colunas.descricao; delete renamed.tabelas[0].colunas.descricao;
   renamed.tabelas[0].mapeamento[0].coluna = 'descricao_real';
+  renamed.tabelas=renamed.tabelas.filter(t=>t.tabela==='diario_industria');
   const renamedGet = async (endpoint, params) => endpoint === APP_CONFIG.endpoints.modelo ? renamed : (
     assert.equal(params.descricao_real, 'Cabeças'),
-    { ok: true, tabela: 'diario_industria', pagina: 1, tamanho: 1000, total: 1, dados: [{ ...row(108915), descricao: 'Kg', descricao_real: 'Cabeças' }] }
+    { ok: true, tabela: 'diario_industria', pagina: 1, tamanho: 1000, total: 1, dados: [{ ...row(108915,'111'), descricao: 'Kg', descricao_real: 'Cabeças' }] }
   );
-  assert.equal((await heads.load(renamedGet, periods, '', signal))[0].quantidade_cabecas, 108915);
+  assert.equal((await heads.load(renamedGet, periods, '111', signal))[0].quantidade_cabecas, 108915);
 
-  const incomplete = async endpoint => endpoint === APP_CONFIG.endpoints.modelo ? catalog : ({ ok: true, tabela: 'diario_industria', pagina: 1, tamanho: 1000, total: 2, dados: [row(1)] });
+  const incomplete = async endpoint => endpoint === APP_CONFIG.endpoints.modelo ? catalog : ({ ok: true, tabela: 'diario_industria_turnos', pagina: 1, tamanho: 1000, total: 2, dados: [row(1)] });
   await assert.rejects(heads.load(incomplete, periods, '', signal), /Paginação/);
-  const changed = async (endpoint, params) => endpoint === APP_CONFIG.endpoints.modelo ? catalog : ({ ok: true, tabela: 'diario_industria', pagina: params.pagina, tamanho: 1, total: params.pagina === 1 ? 2 : 3, dados: [row(1)] });
+  const changed = async (endpoint, params) => endpoint === APP_CONFIG.endpoints.modelo ? catalog : ({ ok: true, tabela: 'diario_industria_turnos', pagina: params.pagina, tamanho: 1, total: params.pagina === 1 ? 2 : 3, dados: [row(1)] });
   await assert.rejects(heads.load(changed, periods, '', signal), /mudou durante/);
   await assert.rejects(heads.load(async () => { throw Error('Sem sessão'); }, periods, '', signal), /Sem sessão/);
   await assert.rejects(heads.load(async endpoint => {
@@ -190,6 +191,7 @@ module.exports = (async () => {
     indicatorMode: 'rendimento', data: { data_limite: '2026-10-27' }, loading: false, fields: { Unidade: { value: '' } },
     productivity: { periods: () => periods, render() {} }, apiGet() {},
     AbortController: class { constructor() { this.signal = { aborted: false }; } abort() { this.signal.aborted = true; } },
+    productivityTargets:{load:async()=>[]},
     productivityHeads: { load(get, periods, units, signal, fullWeek, limit) { return new Promise((resolve, reject) => pending.push({ resolve, reject, signal, fullWeek, limit })); } }
   };
   const controller = source.slice(source.indexOf('  async function refreshHeads('), source.indexOf('  const dialog='));
@@ -224,7 +226,7 @@ module.exports = (async () => {
   state.data = null; await state.refreshHeads();
   assert.equal(pending.length, 7, 'Não consulta produtividade antes de obter o limite do relatório');
   assert.equal(state.headsState.rows.length, 0);
-  console.log('OK: MAX por empresa/data, Descrição exata, paginação completa, empresas e turnos separados, catálogo, datas civis, nulos e erros.');
+  console.log('OK: SUM por turno/dia na A.N., MAX preservado na R.A., Descrição exata, paginação completa, empresas e turnos separados, catálogo, datas civis, nulos e erros.');
   console.log('OK: consultas de Semana cheia incluem dias adjacentes, anos diferentes e não duplicam registros em períodos sobrepostos.');
   console.log('OK: D−1 limita consultas, registros, semanas completas e meses futuros conforme o cabeçalho.');
 })();
