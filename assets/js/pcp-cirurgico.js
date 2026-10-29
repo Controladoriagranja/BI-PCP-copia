@@ -254,9 +254,12 @@ window.PcpCirurgico=(()=>{
   return {sync};
  }
  // Nova modificação de 29/10/2026: peso ao lado do dia, sem alterar valores.
+ function productivityHeaderWeights(rows){
+  return rows.map(row=>'<span class="cg-production-day-weight" title="Peso Vivo para Rendimento · '+esc(row.empresa||'')+'"><span>'+(rows.length>1?esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+' · ':'')+'Peso (kg)</span><strong>'+esc(Number.isFinite(row.peso_vivo)?row.peso_vivo.toLocaleString('pt-BR',{maximumFractionDigits:6}):'—')+'</strong></span>').join('');
+ }
  function productivityDayHeader(day,date,outside,rows){
   const badge='<span class="cg-production-day-number">'+esc(String(day))+(outside?'<small>/'+esc(date.slice(5,7))+'</small>':'')+'</span>';
-  const weights=rows.map(row=>'<span class="cg-production-day-weight" title="Peso Vivo para Rendimento · '+esc(row.empresa||'')+'"><span>'+(rows.length>1?esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+' · ':'')+'Peso (kg)</span><strong>'+esc(Number.isFinite(row.peso_vivo)?row.peso_vivo.toLocaleString('pt-BR',{maximumFractionDigits:6}):'—')+'</strong></span>').join('');
+  const weights=productivityHeaderWeights(rows);
   return '<span class="cg-production-day-header">'+badge+(weights?'<span class="cg-production-day-weights">'+weights+'</span>':'')+'</span>';
  }
  function createProductivityCalendar(content,fields,onNavigate,isLoading,getHeads=()=>({status:'idle',rows:[]})){
@@ -294,7 +297,8 @@ window.PcpCirurgico=(()=>{
    });
   }
   function totalCell(dates,kind,label){
-   return '<td class="cg-production-total" data-cg-total="'+kind+'"><span class="cg-production-total-label">'+esc(label)+'</span>'+headsMarkup(totals(dates))+'</td>';
+   const rows=totals(dates),weights=productivityHeaderWeights(rows);
+   return '<td class="cg-production-total" data-cg-total="'+kind+'" aria-label="'+esc(label)+'">'+(weights?'<span class="cg-production-total-header">'+weights+'</span>':'')+headsMarkup(rows,false)+'</td>';
   }
   function emptyMessage(date){
    if(date&&getHeads().limit&&date>getHeads().limit)return 'Dados disponíveis até '+getHeads().limit.split('-').reverse().join('/')+' (D−1).';
@@ -413,7 +417,7 @@ window.PcpCirurgico=(()=>{
      const key=code+'|'+period,value=sums.get(key);
      const rating=productivityTargets.grade(code,dailyRows.get(key)||[],data.metas||[],'');
      const quantity=value==null?'—':'<strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(rating.meta.toLocaleString('pt-BR'))+' aves"':'')+'>'+esc(value.toLocaleString('pt-BR',{maximumFractionDigits:6}))+'</strong> <small>'+(value===1?'ave':'aves')+'</small>';
-     return '<td><span class="cg-monthly-quantity">'+quantity+'</span>'+productivityReferenceMarkup(value,rating)+productivityWeightMarkup(weights.get(key))+'</td>';
+     return '<td>'+productivityWeightMarkup(weights.get(key))+'<span class="cg-monthly-quantity">'+quantity+'</span>'+productivityReferenceMarkup(value,rating)+'</td>';
     }).join('')+'</tr>';
    }).join('')+'</tbody></table>';
    if(html!==lastHTML){const top=box.scrollTop,left=box.scrollLeft;lastHTML=html;box.innerHTML=html;requestAnimationFrame(()=>{layout(reset);if(!reset){box.scrollTop=top;box.scrollLeft=left;}});}

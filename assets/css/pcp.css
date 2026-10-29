@@ -637,3 +637,8 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
  #cgProdutividade .cg-production-monthly{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
  #cgProdutividade .cg-monthly-scroll{flex:1 1 auto;min-height:0;max-height:none}
 }
+
+/* Nova modificação de 29/10/2026: totais sem títulos repetidos, com peso no topo. */
+#cgProdutividade .cg-production-total-header{display:grid;gap:3px;min-height:28px;align-content:center;margin:0 0 5px}
+#cgProdutividade .cg-production-total-header .cg-production-day-weight{justify-content:space-between}
+#cgProdutividade .cg-monthly-pivot td>.cg-prod-weight:first-child{margin-top:0;margin-bottom:5px;padding-top:0;padding-bottom:4px;border-top:0;border-bottom:1px solid var(--border)}
