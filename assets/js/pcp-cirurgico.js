@@ -373,25 +373,20 @@ window.PcpCirurgico=(()=>{
   const parts=new Intl.DateTimeFormat('en',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit'}).formatToParts(new Date());
   return parts.find(p=>p.type==='year').value+'-'+parts.find(p=>p.type==='month').value;
  }){
-  host.innerHTML='<p class="cg-production-notice" role="status" aria-live="polite"></p><div class="cg-monthly-scroll" tabindex="0" role="region" aria-label="Acumulado mensal por unidade. Arraste para consultar meses anteriores."></div>';
+  host.innerHTML='<p class="cg-production-notice" role="status" aria-live="polite"></p><div class="cg-monthly-scroll" tabindex="0" role="region" aria-label="Acumulado mensal por unidade. Role verticalmente para consultar os meses de janeiro a dezembro."></div>';
   const status=host.querySelector('p'),box=host.querySelector('.cg-monthly-scroll');
-  let lastHTML='',lastPeriods='',columnWidth=145,followLatest=true,pointer=null;
+  let lastHTML='',lastPeriods='';
   function periods(){
-   const now=currentMonth(),yearNow=Number(now.slice(0,4)),monthNow=Number(now.slice(5,7)),selected=PcpMulti.values(fields.Ano.value);
+   const now=currentMonth(),yearNow=Number(now.slice(0,4)),selected=PcpMulti.values(fields.Ano.value);
    const years=[...new Set(selected.length?selected:[...fields.Ano.options].map(o=>o.value))].map(Number).filter(y=>Number.isInteger(y)&&y>=1000&&y<=yearNow).sort((a,b)=>a-b);
-   return years.flatMap(year=>Array.from({length:year===yearNow?monthNow:12},(_,i)=>({year,month:i+1})));
+   return years.flatMap(year=>Array.from({length:12},(_,i)=>({year,month:i+1})));
   }
-  function layout(reset=false,offset=box.scrollLeft/columnWidth){
-   if(!box.clientWidth)return;
+  function layout(reset=false){
    const table=box.querySelector('table');if(!table)return;
-   const count=periods().length;if(!count)return;
-   const fixed=window.matchMedia('(max-width:767px)').matches||box.clientWidth<600?150:250,available=Math.max(120,box.clientWidth-fixed),visible=Math.max(1,Math.min(count,Math.floor(available/145)));
-   columnWidth=Math.max(120,available/visible);
-   table.style.setProperty('--cg-monthly-unit',fixed+'px');table.style.setProperty('--cg-monthly-column',columnWidth+'px');table.style.width=(fixed+count*columnWidth)+'px';
-   if(reset||followLatest){box.scrollLeft=box.scrollWidth;followLatest=true;}
-   else box.scrollLeft=offset*columnWidth;
+   table.style.width='100%';
+   if(reset){box.scrollTop=0;box.scrollLeft=0;}
   }
-  function resetPosition(){followLatest=true;requestAnimationFrame(()=>layout(true));}
+  function resetPosition(){requestAnimationFrame(()=>layout(true));}
   function render(){
    if(host.closest('[hidden]'))return;
    const data=getData(),months=periods(),groupAllowed=PcpMulti.includes(fields.Grupo.value,'producao'),keys=['10','111'],sums=new Map(),dailyRows=new Map(),weights=new Map();
@@ -407,28 +402,23 @@ window.PcpCirurgico=(()=>{
      const key=row.empresa_codigo+'|'+row.data.slice(0,7);weights.set(key,(weights.get(key)??0)+row.peso_vivo);
     }
    }
-   status.textContent=!groupAllowed?'Aves pertencem ao grupo Produção e perdas.':data.status==='loading'?'Consultando acumulados mensais…':data.status==='error'?'Não foi possível consultar o acumulado mensal. Clique em Produtividade para tentar novamente.':'Totais de aves por mês'+(data.limit?' · até '+data.limit.split('-').reverse().join('/')+' (D−1)':'')+'. Mês, Dia e Semana cheia não alteram esta tabela. Arraste para consultar meses anteriores.';
+   status.textContent=!groupAllowed?'Aves pertencem ao grupo Produção e perdas.':data.status==='loading'?'Consultando acumulados mensais…':data.status==='error'?'Não foi possível consultar o acumulado mensal. Clique em Produtividade para tentar novamente.':'Totais de aves por mês'+(data.limit?' · até '+data.limit.split('-').reverse().join('/')+' (D−1)':'')+'. Mês, Dia e Semana cheia não alteram esta tabela. Role verticalmente para consultar os meses de janeiro a dezembro.';
    const signature=months.map(p=>p.year+'-'+p.month).join(','),reset=signature!==lastPeriods;lastPeriods=signature;
    if(!months.length){box.innerHTML='<p class="pcp-report-notice">Sem meses disponíveis para o ano selecionado.</p>';lastHTML='';return;}
-   const html='<table class="cg-table cg-monthly-table"><caption class="cg-production-sr">Acumulado mensal de aves por unidade</caption><colgroup><col class="cg-monthly-unit-col">'+months.map(()=>'<col>').join('')+'</colgroup><thead><tr><th scope="col">Unidade</th>'+months.map(({year,month})=>'<th scope="col">'+esc(new Date(Date.UTC(year,month-1,1)).toLocaleDateString('pt-BR',{month:'short',year:'numeric',timeZone:'UTC'}))+'</th>').join('')+'</tr></thead><tbody>'+keys.map(code=>'<tr><th scope="row">'+esc(headCompanies[code])+'</th>'+months.map(({year,month})=>{
-    const value=sums.get(code+'|'+year+'-'+String(month).padStart(2,'0'));
-    const rating=productivityTargets.grade(code,dailyRows.get(code+'|'+year+'-'+String(month).padStart(2,'0'))||[],data.metas||[],'');
-    return '<td>'+(value==null?'—':'<strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(rating.meta.toLocaleString('pt-BR'))+' aves"':'')+'>'+esc(value.toLocaleString('pt-BR',{maximumFractionDigits:6}))+'</strong> <small>'+(value===1?'ave':'aves')+'</small>'+productivityReferenceMarkup(value,rating))+productivityWeightMarkup(weights.get(code+'|'+year+'-'+String(month).padStart(2,'0')))+'</td>';
-   }).join('')+'</tr>').join('')+'</tbody></table>';
-   if(html!==lastHTML){const offset=box.scrollLeft/columnWidth;lastHTML=html;box.innerHTML=html;requestAnimationFrame(()=>layout(reset,offset));}
+   const html='<table class="cg-table cg-monthly-table cg-monthly-pivot"><caption class="cg-production-sr">Acumulado mensal: meses nas linhas e empresas nas colunas</caption><colgroup><col class="cg-monthly-month-col"><col><col></colgroup><thead><tr><th scope="col">Mês</th>'+keys.map(code=>'<th scope="col">'+esc(headCompanies[code])+'</th>').join('')+'</tr></thead><tbody>'+months.map(({year,month})=>{
+    const period=year+'-'+String(month).padStart(2,'0'),now=currentMonth();
+    const name=new Date(Date.UTC(year,month-1,1)).toLocaleDateString('pt-BR',{month:'long',timeZone:'UTC'});
+    const rowClass=period===now?' class="cg-monthly-current"':period>now?' class="cg-monthly-future"':'';
+    return '<tr data-cg-month-period="'+period+'"'+rowClass+'><th scope="row"><span class="cg-monthly-month-number">'+String(month).padStart(2,'0')+'</span><span class="cg-monthly-month-name">'+esc(name)+'</span><small>'+year+'</small></th>'+keys.map(code=>{
+     const key=code+'|'+period,value=sums.get(key);
+     const rating=productivityTargets.grade(code,dailyRows.get(key)||[],data.metas||[],'');
+     const quantity=value==null?'—':'<strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(rating.meta.toLocaleString('pt-BR'))+' aves"':'')+'>'+esc(value.toLocaleString('pt-BR',{maximumFractionDigits:6}))+'</strong> <small>'+(value===1?'ave':'aves')+'</small>';
+     return '<td><span class="cg-monthly-quantity">'+quantity+'</span>'+productivityReferenceMarkup(value,rating)+productivityWeightMarkup(weights.get(key))+'</td>';
+    }).join('')+'</tr>';
+   }).join('')+'</tbody></table>';
+   if(html!==lastHTML){const top=box.scrollTop,left=box.scrollLeft;lastHTML=html;box.innerHTML=html;requestAnimationFrame(()=>{layout(reset);if(!reset){box.scrollTop=top;box.scrollLeft=left;}});}
    else if(reset)resetPosition();
   }
-  box.addEventListener('scroll',()=>{followLatest=box.scrollWidth-box.clientWidth-box.scrollLeft<4;},{passive:true});
-  box.addEventListener('pointerdown',event=>{if(event.button!==0||event.pointerType==='touch')return;pointer={id:event.pointerId,x:event.clientX,left:box.scrollLeft,dragging:false};});
-  box.addEventListener('pointermove',event=>{
-   if(!pointer||event.pointerId!==pointer.id)return;
-   if(!(event.buttons&1)){stopDrag();return;}
-   const distance=event.clientX-pointer.x;
-   if(!pointer.dragging&&Math.abs(distance)>4){pointer.dragging=true;box.setPointerCapture(pointer.id);box.classList.add('cg-monthly-dragging');}
-   if(pointer.dragging){event.preventDefault();box.scrollLeft=pointer.left-distance;}
-  });
-  function stopDrag(){if(pointer&&box.hasPointerCapture(pointer.id))box.releasePointerCapture(pointer.id);pointer=null;box.classList.remove('cg-monthly-dragging');}
-  box.addEventListener('pointerup',stopDrag);box.addEventListener('pointercancel',stopDrag);box.addEventListener('lostpointercapture',()=>{pointer=null;box.classList.remove('cg-monthly-dragging');});
   new ResizeObserver(()=>layout()).observe(box);
   return {render,periods,resetPosition};
  }
