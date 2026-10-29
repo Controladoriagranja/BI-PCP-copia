@@ -3,6 +3,7 @@ window.PcpCirurgico=(()=>{
  const esc=ApiScreen.escape,pct=v=>v==null?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
  const cols={'1':'1º turno - AN','2':'2º turno - AN','10':'Ave Nova - AN','111':'Real Alimentos'};
  const headCompanies={'10':'Ave Nova','111':'Real Alimentos'};
+ const headCompanyLabels={'10':'A.N.','111':'R.A.'};
  function headCompany(value){
   const text=String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
   if(/^(?:0*10|an)$/.test(text)||/\bave ?nova\b/.test(text))return '10';
@@ -160,7 +161,19 @@ window.PcpCirurgico=(()=>{
    return companies.map(code=>rows.find(row=>row.empresa_codigo===code)||{data:date,empresa_codigo:code,empresa:headCompanies[code],quantidade_cabecas:null});
   }
   function headsMarkup(rows){
-   return rows.length?'<span class="cg-production-heads">'+rows.map(row=>'<span><span>'+esc(row.empresa)+'</span><strong>'+esc(formatHeads(row.quantidade_cabecas))+' <small>'+birdUnit(row.quantidade_cabecas)+'</small></strong></span>').join('')+'</span>':'<span class="cg-production-empty" aria-hidden="true">—</span>';
+   return rows.length?'<span class="cg-production-heads">'+rows.map(row=>'<span><span title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+'</span><strong>'+esc(formatHeads(row.quantidade_cabecas))+' <small>'+birdUnit(row.quantidade_cabecas)+'</small></strong></span>').join('')+'</span>':'<span class="cg-production-empty" aria-hidden="true">—</span>';
+  }
+  function dayMetrics(date,rows,allowed){
+   const companies=selectedHeadCompanies(fields.Unidade?.value),state=getHeads();
+   const canShow=allowed&&state.status==='ready'&&state.limit&&date<=state.limit&&PcpMulti.includes(fields.Grupo?.value,'producao');
+   const columns=[];
+   if(companies.includes('10'))columns.push(
+    {key:'1',label:'1º A.N.',name:'1º turno - Ave Nova',value:canShow?0:null,temporary:true},
+    {key:'2',label:'2º A.N.',name:'2º turno - Ave Nova',value:canShow?0:null,temporary:true},
+    {key:'10',label:'A.N.',name:headCompanies['10'],value:rows.find(row=>row.empresa_codigo==='10')?.quantidade_cabecas??null}
+   );
+   if(companies.includes('111'))columns.push({key:'111',label:'R.A.',name:headCompanies['111'],value:rows.find(row=>row.empresa_codigo==='111')?.quantidade_cabecas??null});
+   return '<span class="cg-day-metrics" style="--cg-metric-units:'+columns.length+'"><span class="cg-day-metric-header"><span></span>'+columns.map(column=>'<abbr title="'+esc(column.name)+'">'+esc(column.label)+'</abbr>').join('')+'</span><span class="cg-day-metric-row"><span class="cg-day-metric-name">Aves</span>'+columns.map(column=>'<span class="cg-day-metric-value" data-cg-unit="'+column.key+'"'+(column.temporary?' title="Provisório: divisão por turno ainda não implementada."':'')+'>'+esc(formatHeads(column.value))+'</span>').join('')+'</span></span>';
   }
   function totals(dates){
    if(getHeads().status!=='ready'||!PcpMulti.includes(fields.Grupo?.value,'producao'))return [];
@@ -195,7 +208,7 @@ window.PcpCirurgico=(()=>{
   }
   function renderDetail(){
    detail.hidden=!selectedDay;
-   if(selectedDay){const date=new Date(selectedDay+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}),rows=dayHeads(selectedDay);detail.innerHTML='<header><h2>Detalhamento do dia · '+esc(date)+'</h2></header>'+(rows.length?'<dl class="cg-production-heads-detail">'+rows.map(row=>'<div><dt>'+esc(row.empresa)+' · Aves</dt><dd>'+esc(formatHeads(row.quantidade_cabecas))+'</dd></div>').join('')+'</dl><p class="cg-production-notice">Maior quantidade de aves por empresa e dia, conforme os registros da fonte.</p>':'<p class="cg-production-notice">'+esc(emptyMessage(selectedDay))+'</p>');}
+   if(selectedDay){const date=new Date(selectedDay+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}),rows=dayHeads(selectedDay);detail.innerHTML='<header><h2>Detalhamento do dia · '+esc(date)+'</h2></header>'+(rows.length?'<dl class="cg-production-heads-detail">'+rows.map(row=>'<div><dt title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+' · Aves</dt><dd>'+esc(formatHeads(row.quantidade_cabecas))+'</dd></div>').join('')+'</dl><p class="cg-production-notice">Maior quantidade de aves por empresa e dia, conforme os registros da fonte.</p>':'<p class="cg-production-notice">'+esc(emptyMessage(selectedDay))+'</p>');}
    for(const button of monthsHost.querySelectorAll('[data-cg-day]'))button.setAttribute('aria-pressed',String(button.dataset.cgDay===selectedDay));
   }
   function render(){
@@ -214,7 +227,7 @@ window.PcpCirurgico=(()=>{
      const rows=allowed?dayHeads(date):[],summary=rows.map(row=>row.empresa+': '+(row.quantidade_cabecas==null?'sem registro':formatHeads(row.quantidade_cabecas)+' '+birdUnit(row.quantidade_cabecas))).join('; ');
      const bothEmpty=state.status==='ready'&&['10','111'].every(code=>(state.rows.find(row=>row.data===date&&row.empresa_codigo===code)?.quantidade_cabecas??0)===0);
      const classes=[outside?'cg-production-adjacent':'',bothEmpty?'cg-production-rest':''].filter(Boolean).join(' ');
-     return '<td'+(classes?' class="'+classes+'"':'')+'><button type="button" data-cg-day="'+date+'" aria-pressed="false" aria-label="'+esc(day+' de '+(outside?monthName(Number(date.slice(0,4)),Number(date.slice(5,7))):label)+' · '+(allowed?(summary||emptyMessage(date)):'Fora do filtro de dia'))+'"'+(allowed?'':' disabled')+'><span class="cg-production-day-number">'+day+(outside?'<small>/'+date.slice(5,7)+'</small>':'')+'</span>'+headsMarkup(rows)+'</button></td>';
+     return '<td'+(classes?' class="'+classes+'"':'')+'><button type="button" data-cg-day="'+date+'" aria-pressed="false" aria-label="'+esc(day+' de '+(outside?monthName(Number(date.slice(0,4)),Number(date.slice(5,7))):label)+' · '+(allowed?(summary||emptyMessage(date)):'Fora do filtro de dia'))+'"'+(allowed?'':' disabled')+'><span class="cg-production-day-number">'+day+(outside?'<small>/'+date.slice(5,7)+'</small>':'')+'</span>'+dayMetrics(date,rows,allowed)+'</button></td>';
     });
     const weeks=Array.from({length:dates.length/7},(_,week)=>'<tr>'+slots.slice(week*7,week*7+7).join('')+totalCell(dates.slice(week*7,week*7+7),'week-'+week,'Total semanal')+'</tr>').join('');
     const footer=weekdays.map((day,index)=>totalCell(dates.filter((date,i)=>i%7===index),'weekday-'+index,'Total de '+day.toLowerCase())).join('')+totalCell(dates,'month',fullWeek?'Total do período':'Total do mês');
