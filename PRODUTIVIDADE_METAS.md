@@ -69,6 +69,15 @@ As legendas ficam no cabeçalho dos dois blocos, sem ocupar as setas. O tema esc
 usa cores de texto próprias. Mês continua com seleção única no calendário; o mensal
 ignora Mês, Dia e Semana cheia, preservando o comportamento existente.
 
+Os dias, o detalhamento selecionado e todos os totais exibem também **Meta** e
+**Diferença**, por empresa, abaixo do realizado. A diferença é `realizado - meta`:
+positivo com `+`, negativo com `-`, igualdade com `0`. Exemplo de 01/10: A.N.
+114.402, meta 110.000, diferença +4.402. Sem referência, Meta e Diferença ficam
+com `—`; dias sem registro permanecem sem valores inventados. Essa apresentação
+reutiliza a mesma meta calculada para as cores e respeita os filtros de turno.
+Inclui totais semanais, rodapé por dia da semana, total do mês/período e acumulado
+mensal. A grade permite o conteúdo adicional sem alterar a largura das colunas.
+
 ## Integração com a API atual, conferida no ZIP enviado
 
 O frontend usa o mesmo `apiGet`, Worker e sessão CENTRAL. A leitura nova é:

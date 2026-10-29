@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../assets/js/pcp-cirurgico.js'),'utf8');
 const context={window:{},ApiScreen:{escape:String},DOMException:class extends Error{constructor(message,name){super(message);this.name=name;}},APP_CONFIG:{endpoints:{modelo:'/api/pcp/tabelas',tabelaModelo:'/api/pcp/dados/'}},PcpMulti:{values:v=>String(v||'').split(',').filter(Boolean)}};
-vm.runInNewContext(source.replace('return {mount};','return {mount,productivityTargets,productivityHeads};'),context);
+vm.runInNewContext(source.replace('return {mount};','return {mount,productivityTargets,productivityHeads,productivityReferenceMarkup};'),context);
 const targets=context.window.PcpCirurgico.productivityTargets;
 const weekdays=['SEG','TER','QUA','QUI','SEX','SAB'];
 const base={'AN_T1':[65000,65000,65000,65000,65000,60000],'AN_T2':[55000,55000,50000,45000,45000,null],'RA':[80000,80000,80000,80000,80000,60000]};
@@ -11,6 +11,15 @@ const metas=Object.entries(base).flatMap(([series,values])=>values.flatMap((valu
 }]));
 const row=(date,value,company='10')=>({data:date,empresa_codigo:company,quantidade_cabecas:value});
 const grade=(rows,units='',company='10',goals=metas)=>JSON.parse(JSON.stringify(targets.grade(company,rows,goals,units)));
+const reference=context.window.PcpCirurgico.productivityReferenceMarkup;
+const positive=reference(114402,grade([row('2026-10-01',114402)]));
+assert.match(positive,/>Meta<\/span><span>110\.000<\/span>/);
+assert.match(positive,/class="cg-prod-good">\+4\.402<\/strong>/);
+assert.match(reference(58363,grade([row('2026-10-03',58363)])),/class="cg-prod-bad">-1\.637<\/strong>/);
+assert.match(reference(120000,grade([row('2026-10-05',120000)])),/class="cg-prod-good">0<\/strong>/);
+const noGoal=reference(100,{meta:null,className:''});
+assert.match(noGoal,/>Meta<\/span><span>—<\/span>/);assert.match(noGoal,/<strong>—<\/strong>/);
+assert.doesNotMatch(noGoal,/NaN|Infinity|\+100/,'Sem meta não inventa diferença');
 assert.deepEqual(grade([row('2026-10-05',120000)]),{className:'cg-prod-good',meta:120000});
 assert.deepEqual(grade([row('2026-10-05',119999)]),{className:'cg-prod-bad',meta:120000});
 assert.deepEqual(grade([row('2026-10-05',65000)],'1'),{className:'cg-prod-good',meta:65000});

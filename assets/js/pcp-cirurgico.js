@@ -181,6 +181,11 @@ window.PcpCirurgico=(()=>{
   }
   return {load,grade};
  })();
+ function productivityReferenceMarkup(value,rating){
+  const meta=Number.isFinite(rating.meta)?rating.meta:null,difference=Number.isFinite(value)&&meta!=null?value-meta:null;
+  const format=number=>number==null?'—':number.toLocaleString('pt-BR',{maximumFractionDigits:6});
+  return '<span class="cg-prod-reference"><span><span>Meta</span><span>'+esc(format(meta))+'</span></span><span><span title="Realizado menos meta">Diferença</span><strong'+(difference!=null&&rating.className?' class="'+rating.className+'"':'')+'>'+esc((difference>0?'+':'')+format(difference))+'</strong></span></span>';
+ }
  const productivityLegend='<div class="cg-prod-legend" aria-label="Referências de produtividade"><span><i class="cg-prod-dot cg-prod-dot-good" aria-hidden="true"></i>Dentro da referência</span><span><i class="cg-prod-dot cg-prod-dot-bad" aria-hidden="true"></i>Fora da referência</span></div>';
  function createProductivityMonthFilter(select,currentMonth=()=>new Intl.DateTimeFormat('en',{timeZone:'America/Sao_Paulo',month:'numeric'}).format(new Date())){
   let active=false,savedMonths='',month='',boundHost=null;
@@ -232,7 +237,7 @@ window.PcpCirurgico=(()=>{
   function headsMarkup(rows){
    return rows.length?'<span class="cg-production-heads">'+rows.map(row=>{
     const rating=productivityTargets.grade(row.empresa_codigo,row._days||[row],getHeads().metas||[],fields.Unidade.value);
-    return '<span><span title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+'</span><strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(formatHeads(rating.meta))+' aves"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+' <small>'+birdUnit(row.quantidade_cabecas)+'</small></strong></span>';
+    return '<span><span title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+'</span><strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(formatHeads(rating.meta))+' aves"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+' <small>'+birdUnit(row.quantidade_cabecas)+'</small></strong>'+productivityReferenceMarkup(row.quantidade_cabecas,rating)+'</span>';
    }).join('')+'</span>':'<span class="cg-production-empty" aria-hidden="true">—</span>';
   }
   function totals(dates){
@@ -268,7 +273,13 @@ window.PcpCirurgico=(()=>{
   }
   function renderDetail(){
    detail.hidden=!selectedDay;
-   if(selectedDay){const date=new Date(selectedDay+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}),rows=dayHeads(selectedDay);detail.innerHTML='<header><h2>Detalhamento do dia · '+esc(date)+'</h2></header>'+(rows.length?'<dl class="cg-production-heads-detail">'+rows.map(row=>'<div><dt title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+' · Aves</dt><dd>'+esc(formatHeads(row.quantidade_cabecas))+'</dd></div>').join('')+'</dl><p class="cg-production-notice">Valores de aves por empresa e dia, conforme os registros da fonte.</p>':'<p class="cg-production-notice">'+esc(emptyMessage(selectedDay))+'</p>');}
+   if(selectedDay){
+    const date=new Date(selectedDay+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}),rows=dayHeads(selectedDay);
+    detail.innerHTML='<header><h2>Detalhamento do dia · '+esc(date)+'</h2></header>'+(rows.length?'<dl class="cg-production-heads-detail">'+rows.map(row=>{
+     const rating=productivityTargets.grade(row.empresa_codigo,[row],getHeads().metas||[],fields.Unidade.value);
+     return '<div><dt title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+' · Aves</dt><dd><strong'+(rating.className?' class="'+rating.className+'"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+'</strong>'+productivityReferenceMarkup(row.quantidade_cabecas,rating)+'</dd></div>';
+    }).join('')+'</dl><p class="cg-production-notice">Valores de aves por empresa e dia, conforme os registros da fonte.</p>':'<p class="cg-production-notice">'+esc(emptyMessage(selectedDay))+'</p>');
+   }
    for(const button of monthsHost.querySelectorAll('[data-cg-day]'))button.setAttribute('aria-pressed',String(button.dataset.cgDay===selectedDay));
   }
   function render(){
@@ -353,7 +364,7 @@ window.PcpCirurgico=(()=>{
    const html='<table class="cg-table cg-monthly-table"><caption class="cg-production-sr">Acumulado mensal de aves por unidade</caption><colgroup><col class="cg-monthly-unit-col">'+months.map(()=>'<col>').join('')+'</colgroup><thead><tr><th scope="col">Unidade</th>'+months.map(({year,month})=>'<th scope="col">'+esc(new Date(Date.UTC(year,month-1,1)).toLocaleDateString('pt-BR',{month:'short',year:'numeric',timeZone:'UTC'}))+'</th>').join('')+'</tr></thead><tbody>'+keys.map(code=>'<tr><th scope="row">'+esc(headCompanies[code])+'</th>'+months.map(({year,month})=>{
     const value=sums.get(code+'|'+year+'-'+String(month).padStart(2,'0'));
     const rating=productivityTargets.grade(code,dailyRows.get(code+'|'+year+'-'+String(month).padStart(2,'0'))||[],data.metas||[],fields.Unidade.value);
-    return '<td>'+(value==null?'—':'<strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(rating.meta.toLocaleString('pt-BR'))+' aves"':'')+'>'+esc(value.toLocaleString('pt-BR',{maximumFractionDigits:6}))+'</strong> <small>'+(value===1?'ave':'aves')+'</small>')+'</td>';
+    return '<td>'+(value==null?'—':'<strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(rating.meta.toLocaleString('pt-BR'))+' aves"':'')+'>'+esc(value.toLocaleString('pt-BR',{maximumFractionDigits:6}))+'</strong> <small>'+(value===1?'ave':'aves')+'</small>'+productivityReferenceMarkup(value,rating))+'</td>';
    }).join('')+'</tr>').join('')+'</tbody></table>';
    if(html!==lastHTML){const offset=box.scrollLeft/columnWidth;lastHTML=html;box.innerHTML=html;requestAnimationFrame(()=>layout(reset,offset));}
    else if(reset)resetPosition();
