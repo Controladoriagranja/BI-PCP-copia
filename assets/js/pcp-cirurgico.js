@@ -112,6 +112,35 @@ window.PcpCirurgico=(()=>{
   }
   return {load};
  })();
+ function createProductivityMonthFilter(select,currentMonth=()=>new Intl.DateTimeFormat('en',{timeZone:'America/Sao_Paulo',month:'numeric'}).format(new Date())){
+  const single=document.createElement('select');single.id='cgMesProdutividade';single.dataset.pcpMulti='single';single.hidden=true;single.innerHTML=select.innerHTML;
+  single.setAttribute('aria-label','Mês do calendário de Produtividade');select.after(single);
+  let active=false,savedMonths='',month='';
+  const values=()=>PcpMulti.values(select.value).map(Number).filter(n=>Number.isInteger(n)&&n>=1&&n<=12).map(String);
+  const choose=list=>list.length===1?list[0]:list.includes(currentMonth())?currentMonth():list.length?String(Math.max(...list.map(Number))):currentMonth();
+  function sync(mode){
+   const previous=select.value;
+   const multi=select.pcpMulti,host=multi?.controller.getState(multi.field).host;
+   if(mode==='produtividade'){
+    const selected=values();
+    if(!active){savedMonths=select.value;month=choose(selected);active=true;multi?.controller.closeAll();}
+    else if(selected.length===1)month=selected[0];
+    if(select.value!==month)select.value=month;
+    single.value=month;single.hidden=false;if(host)host.hidden=true;
+   }else{
+    if(active){active=false;select.value=savedMonths;multi?.controller.closeAll();}
+    single.hidden=true;if(host)host.hidden=false;
+   }
+   return previous!==select.value;
+  }
+  single.addEventListener('change',()=>{
+   if(!active)return;
+   const chosen=Number(single.value);
+   if(!Number.isInteger(chosen)||chosen<1||chosen>12){sync('produtividade');return;}
+   month=String(chosen);select.value=month;select.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  return {sync};
+ }
  function createProductivityCalendar(content,fields,onNavigate,isLoading,getHeads=()=>({status:'idle',rows:[]})){
   const root=document.createElement('section');root.id='cgProdutividade';root.hidden=true;
   root.innerHTML='<article class="card pcp-report-panel"><header class="cg-production-header"><h2>Calendário de Produção</h2><nav aria-label="Navegação do calendário"><button type="button" data-cg-month="-1" aria-label="Mês anterior">←</button><button type="button" data-cg-month="1" aria-label="Próximo mês">→</button></nav></header><p class="cg-production-notice">Consultando quantidade de aves…</p><div class="cg-production-months"></div></article><article class="card pcp-report-panel cg-production-detail" hidden aria-live="polite" aria-atomic="true"></article><article class="card pcp-report-panel"><header><h2>Acumulado mensal</h2></header></article>';
@@ -149,7 +178,12 @@ window.PcpCirurgico=(()=>{
   }
   function periods(){
    const years=PcpMulti.values(fields.Ano.value),months=PcpMulti.values(fields.Mes.value);
-   return (years.length?years:[...fields.Ano.options].map(o=>o.value)).flatMap(year=>(months.length?months:Array.from({length:12},(_,i)=>String(i+1))).map(month=>({year:Number(year),month:Number(month)}))).filter(p=>Number.isInteger(p.year)&&p.year>=1000&&p.year<=9999&&Number.isInteger(p.month)&&p.month>=1&&p.month<=12).sort((a,b)=>a.year-b.year||a.month-b.month);
+   const now=new Date(),yearNow=Number(now.toLocaleDateString('en',{timeZone:'America/Sao_Paulo',year:'numeric'})),monthNow=Number(now.toLocaleDateString('en',{timeZone:'America/Sao_Paulo',month:'numeric'}));
+   const available=(years.length?years:[...fields.Ano.options].map(o=>o.value)).map(Number).filter(year=>Number.isInteger(year)&&year>=1000&&year<=9999);
+   const selected=months.map(Number).filter(month=>Number.isInteger(month)&&month>=1&&month<=12);
+   if(!available.length)return [];
+   const year=available.includes(yearNow)?yearNow:Math.max(...available),month=selected.includes(monthNow)?monthNow:selected.length?Math.max(...selected):monthNow;
+   return [{year,month}];
   }
   function targetMonth(direction){
    const list=periods();if(!list.length)return null;
@@ -266,6 +300,7 @@ window.PcpCirurgico=(()=>{
 
   const content=document.getElementById('pcpConteudo');content.className='pcp-report-panels';content.innerHTML='<article class="card pcp-report-panel"><header><h2>Indicadores por dia</h2></header><div id="cgDiario" class="cg-scroll"></div></article><article class="card pcp-report-panel"><header><h2>Acumulado mensal</h2><div hidden><p>Razões calculadas pelos pesos acumulados até D−1. A seleção de dia limita o quadro diário; o acumulado mantém o mês escolhido.</p><p>Condenação: menor ou igual à meta. Demais indicadores: maior ou igual à meta. Ausência de base é apresentada como —.</p></div></header><div id="cgMensal" class="cg-scroll"></div></article>';
   const ids=['Ano','Mes','Dia','Unidade','Grupo'],fields=Object.fromEntries(ids.map(k=>[k,document.getElementById('cg'+k)]));let data=null,generation=0,controller,loading=false;
+  const monthFilter=createProductivityMonthFilter(fields.Mes);
   let headsState={status:'idle',rows:[]},headsKey='',headsGeneration=0,headsController=null;
   let monthlyState={status:'idle',rows:[]},monthlyKey='',monthlyGeneration=0,monthlyController=null;
   const indicatorWeekFilter=document.createElement('label');indicatorWeekFilter.className='cg-production-week-filter';indicatorWeekFilter.hidden=true;
@@ -280,11 +315,13 @@ window.PcpCirurgico=(()=>{
   let indicatorMode='rendimento';
   const indicatorFlags=PcpPeriodFlags.create('cgTipoIndicador',indicatorMode,mode=>{
    indicatorMode=mode;
+   const monthChanged=monthFilter.sync(mode);
+   if(mode==='produtividade'&&monthChanged)fields.Dia.value='';
    for(const panel of yieldPanels)panel.hidden=mode==='produtividade';
    indicatorWeekFilter.hidden=mode!=='produtividade';
    productivity.root.hidden=mode!=='produtividade';productivity.render();
    if(mode==='rendimento'){load();requestAnimationFrame(scrollTablesToLatest);}
-   else{refreshHeads(true);refreshMonthly(true);monthly.resetPosition();}
+   else{if(monthChanged)load();else{refreshHeads(true);refreshMonthly(true);}monthly.resetPosition();}
   },[['rendimento','Rendimento'],['produtividade','Produtividade']]);
   indicatorFlags.setAttribute('aria-label','Tipo de indicador');
   indicatorFlags.querySelector('legend').textContent='Tipo de indicador';
@@ -389,6 +426,7 @@ window.PcpCirurgico=(()=>{
   if(mobile)document.querySelector('#cgDiario').previousElementSibling.insertAdjacentHTML('beforeend','<p class="ef-mobile-units">AN · Ave Nova &nbsp; / &nbsp; RA · Real Alimentos<br>1º / 2º · Turnos da Ave Nova</p>');
   const tableObserver=new ResizeObserver(()=>scrollTablesToLatest());for(const id of ['cgDiario','cgMensal'])tableObserver.observe(document.getElementById(id));
   function render(){
+   monthFilter.sync(indicatorMode);
    refreshHeads();
    refreshMonthly();
    productivity.render();
@@ -401,6 +439,7 @@ window.PcpCirurgico=(()=>{
    document.getElementById('cgDiario').innerHTML=table(data.dias.filter(d=>PcpMulti.includes(fields.Dia.value,d.data)),false);document.getElementById('cgMensal').innerHTML=table(data.mensal,true);syncLineFilters();renderLine();requestAnimationFrame(scrollTablesToLatest);
   }
   async function load(){
+   monthFilter.sync(indicatorMode);
    const id=++generation;if(controller)controller.abort();controller=new AbortController();loading=true;
    refreshHeads(true);
    refreshMonthly();
@@ -413,7 +452,7 @@ window.PcpCirurgico=(()=>{
   }
   fields.Ano.onchange=fields.Mes.onchange=()=>{fields.Dia.value='';load();};fields.Dia.onchange=fields.Unidade.onchange=fields.Grupo.onchange=render;document.getElementById('cgLimpar').onclick=()=>{fields.Grupo.value=fields.Unidade.value=fields.Dia.value='';fields.Ano.value=now.getFullYear();fields.Mes.value=now.getMonth()+1;if(indicatorMode==='produtividade'){fields.SemanaCheia.checked=false;monthly.resetPosition();}load();};
   function refreshAutomatically(){if(indicatorMode==='rendimento'&&!document.hidden&&!loading)load();}
-  setInterval(refreshAutomatically,60000);document.addEventListener('visibilitychange',refreshAutomatically);PcpMulti.enhance(filter);load();
+  setInterval(refreshAutomatically,60000);document.addEventListener('visibilitychange',refreshAutomatically);PcpMulti.enhance(filter);monthFilter.sync(indicatorMode);load();
  }
  return {mount};
 })();

@@ -512,6 +512,7 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 .pcp-report[data-page="report-g8"] .cg-filter-row>.cg-filter-grid{flex:1 1 770px;max-width:966px;min-width:0}
 .pcp-report[data-page="report-g8"] .cg-filter-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;flex:1 1 350px;min-width:0;min-height:36px;gap:12px}
 .pcp-report[data-page="report-g8"] #cgLimpar{background:var(--card);border-color:var(--border);color:var(--foreground)}
+.pcp-report[data-page="report-g8"] #cgMesProdutividade[hidden],.pcp-report[data-page="report-g8"] #cgMesMulti[hidden]{display:none}
 
 /* Acumulado de Produtividade: mesma tabela do Rendimento, com unidade fixa e meses roláveis. */
 #cgProdutividade .cg-monthly-scroll{width:100%;max-width:100%;min-width:0;overflow:auto;cursor:grab;scrollbar-width:auto;scrollbar-color:var(--muted-foreground) var(--secondary);-webkit-overflow-scrolling:touch}
