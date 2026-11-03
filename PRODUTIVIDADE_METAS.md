@@ -27,6 +27,14 @@ seção. Não há soma entre seções, prioridade de Abate ou complemento de dat
 outra fonte no mensal geral. O calendário mantém sua seleção de Abate por turnos.
 Metas, diferenças, D−1 e a regra da R.A. são preservados.
 
+O mensal inclui a coluna **Total do mês**, somando Ave Nova e Real Alimentos,
+e a linha **Total do ano**, com cada empresa e o consolidado na última coluna.
+Cada ano selecionado tem sua própria linha de total. Aves e Peso (kg) somam os
+valores disponíveis até D−1; as metas seguem os dias realizados de cada empresa.
+Uma referência incompleta deixa a meta e a diferença consolidadas sem valor ou
+cor parcial. Peso continua sem meta. Os totais usam vinho claro do tema e a
+tabela permite rolagem horizontal dentro do painel, com o mês fixo à esquerda.
+
 A rotina de leitura preserva a seleção do maior registro de Cabeças por
 empresa/dia, sem restringir seção no diário comum. O mensal não usa a seleção
 de turno do calendário para seus valores ou metas e não repete consultas quando

@@ -611,7 +611,7 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 
 /* Nova modificação de 29/10/2026: mensal pivotado, janeiro a dezembro nas linhas. */
 #cgProdutividade .cg-monthly-scroll{cursor:auto;max-height:min(720px,75dvh);scrollbar-gutter:stable;overscroll-behavior:contain}
-#cgProdutividade .cg-monthly-pivot{width:100%;min-width:360px;table-layout:fixed}
+#cgProdutividade .cg-monthly-pivot{width:100%;min-width:650px;table-layout:fixed}
 #cgProdutividade .cg-monthly-pivot col:first-child{width:78px}
 #cgProdutividade .cg-monthly-pivot col:not(:first-child){width:auto}
 #cgProdutividade .cg-monthly-pivot thead th{position:sticky;top:0;z-index:5;background:var(--card);font-size:13px;text-align:center;white-space:normal;padding:8px 5px}
@@ -631,6 +631,12 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 #cgProdutividade .cg-monthly-pivot .cg-prod-weight strong{font-size:13px}
 #cgProdutividade .cg-monthly-pivot tbody .cg-monthly-current>th{background:color-mix(in srgb,var(--accent) 12%,var(--card))}
 #cgProdutividade .cg-monthly-pivot .cg-monthly-future{color:var(--muted-foreground)}
+#cgProdutividade .cg-monthly-pivot .cg-monthly-total,
+#cgProdutividade .cg-monthly-pivot .cg-monthly-annual>*,
+#cgProdutividade .cg-monthly-pivot tbody tr.cg-monthly-annual>th:first-child{background:color-mix(in srgb,var(--primary) 10%,var(--card))}
+#cgProdutividade .cg-monthly-pivot .cg-monthly-annual>*{border-top:2px solid color-mix(in srgb,var(--primary) 25%,var(--border))}
+#cgProdutividade .cg-monthly-pivot .cg-monthly-annual>th{font-size:12px;font-weight:700}
+#cgProdutividade .cg-monthly-pivot .cg-monthly-grand-total{box-shadow:inset 1px 0 0 var(--border)}
 @media(min-width:1600px){
  #cgProdutividade>article:last-child{align-self:stretch;contain:size;min-height:0;display:flex;flex-direction:column;overflow:hidden}
  #cgProdutividade>article:last-child>header{flex:0 0 auto}

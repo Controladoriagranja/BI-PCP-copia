@@ -377,7 +377,7 @@ window.PcpCirurgico=(()=>{
   const parts=new Intl.DateTimeFormat('en',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit'}).formatToParts(new Date());
   return parts.find(p=>p.type==='year').value+'-'+parts.find(p=>p.type==='month').value;
  }){
-  host.innerHTML='<p class="cg-production-notice" role="status" aria-live="polite"></p><div class="cg-monthly-scroll" tabindex="0" role="region" aria-label="Acumulado mensal por unidade. Role verticalmente para consultar os meses de janeiro a dezembro."></div>';
+  host.innerHTML='<p class="cg-production-notice" role="status" aria-live="polite"></p><div class="cg-monthly-scroll" tabindex="0" role="region" aria-label="Acumulado mensal por unidade. Role verticalmente para consultar os meses e horizontalmente para ver o total do mês."></div>';
   const status=host.querySelector('p'),box=host.querySelector('.cg-monthly-scroll');
   let lastHTML='',lastPeriods='';
   function periods(){
@@ -409,16 +409,33 @@ window.PcpCirurgico=(()=>{
    status.textContent=!groupAllowed?'Aves pertencem ao grupo Produção e perdas.':data.status==='loading'?'Consultando acumulados mensais…':data.status==='error'?'Não foi possível consultar o acumulado mensal. Clique em Produtividade para tentar novamente.':'Totais de aves por mês'+(data.limit?' · até '+data.limit.split('-').reverse().join('/')+' (D−1)':'')+'. Mês, Dia e Semana cheia não alteram esta tabela. Role verticalmente para consultar os meses de janeiro a dezembro.';
    const signature=months.map(p=>p.year+'-'+p.month).join(','),reset=signature!==lastPeriods;lastPeriods=signature;
    if(!months.length){box.innerHTML='<p class="pcp-report-notice">Sem meses disponíveis para o ano selecionado.</p>';lastHTML='';return;}
-   const html='<table class="cg-table cg-monthly-table cg-monthly-pivot"><caption class="cg-production-sr">Acumulado mensal: meses nas linhas e empresas nas colunas</caption><colgroup><col class="cg-monthly-month-col"><col><col></colgroup><thead><tr><th scope="col">Mês</th>'+keys.map(code=>'<th scope="col">'+esc(headCompanies[code])+'</th>').join('')+'</tr></thead><tbody>'+months.map(({year,month})=>{
+   function summary(code,periods){
+    const entries=periods.map(period=>code+'|'+period),rows=entries.flatMap(key=>dailyRows.get(key)||[]);
+    const sum=map=>{const values=entries.map(key=>map.get(key)).filter(Number.isFinite);return values.length?values.reduce((a,b)=>a+b,0):null;};
+    return {value:sum(sums),weight:sum(weights),rating:productivityTargets.grade(code,rows,data.metas||[],'')};
+   }
+   function combined(items){
+    const sum=field=>{const values=items.map(item=>item[field]).filter(Number.isFinite);return values.length?values.reduce((a,b)=>a+b,0):null;};
+    const actual=items.filter(item=>Number.isFinite(item.value)),value=sum('value');
+    const meta=actual.length&&actual.every(item=>Number.isFinite(item.rating.meta))?actual.reduce((total,item)=>total+item.rating.meta,0):null;
+    return {value,weight:sum('weight'),rating:{meta,className:meta==null?'':value>=meta?'cg-prod-good':'cg-prod-bad'}};
+   }
+   function cell({value,weight,rating},className=''){
+    const quantity=value==null?'—':'<strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(rating.meta.toLocaleString('pt-BR'))+' aves"':'')+'>'+esc(value.toLocaleString('pt-BR',{maximumFractionDigits:6}))+'</strong> <small>'+(value===1?'ave':'aves')+'</small>';
+    return '<td'+(className?' class="'+className+'"':'')+'>'+productivityWeightMarkup(weight)+'<span class="cg-monthly-quantity">'+quantity+'</span>'+productivityReferenceMarkup(value,rating)+'</td>';
+   }
+   const html='<table class="cg-table cg-monthly-table cg-monthly-pivot"><caption class="cg-production-sr">Acumulado mensal por empresa, total do mês e totais anuais até D−1</caption><colgroup><col class="cg-monthly-month-col"><col><col><col></colgroup><thead><tr><th scope="col">Mês</th>'+keys.map(code=>'<th scope="col">'+esc(headCompanies[code])+'</th>').join('')+'<th scope="col" class="cg-monthly-total">Total do mês</th></tr></thead><tbody>'+months.map(({year,month})=>{
     const period=year+'-'+String(month).padStart(2,'0'),now=currentMonth();
     const name=new Date(Date.UTC(year,month-1,1)).toLocaleDateString('pt-BR',{month:'long',timeZone:'UTC'});
     const rowClass=period===now?' class="cg-monthly-current"':period>now?' class="cg-monthly-future"':'';
-    return '<tr data-cg-month-period="'+period+'"'+rowClass+'><th scope="row"><span class="cg-monthly-month-number">'+String(month).padStart(2,'0')+'</span><span class="cg-monthly-month-name">'+esc(name)+'</span><small>'+year+'</small></th>'+keys.map(code=>{
-     const key=code+'|'+period,value=sums.get(key);
-     const rating=productivityTargets.grade(code,dailyRows.get(key)||[],data.metas||[],'');
-     const quantity=value==null?'—':'<strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(rating.meta.toLocaleString('pt-BR'))+' aves"':'')+'>'+esc(value.toLocaleString('pt-BR',{maximumFractionDigits:6}))+'</strong> <small>'+(value===1?'ave':'aves')+'</small>';
-     return '<td>'+productivityWeightMarkup(weights.get(key))+'<span class="cg-monthly-quantity">'+quantity+'</span>'+productivityReferenceMarkup(value,rating)+'</td>';
-    }).join('')+'</tr>';
+    const items=keys.map(code=>summary(code,[period]));
+    let html='<tr data-cg-month-period="'+period+'"'+rowClass+'><th scope="row"><span class="cg-monthly-month-number">'+String(month).padStart(2,'0')+'</span><span class="cg-monthly-month-name">'+esc(name)+'</span><small>'+year+'</small></th>'+items.map(item=>cell(item)).join('')+cell(combined(items),'cg-monthly-total')+'</tr>';
+    if(month===12){
+     const annualPeriods=months.filter(p=>p.year===year).map(p=>p.year+'-'+String(p.month).padStart(2,'0'));
+     const annual=keys.map(code=>summary(code,annualPeriods));
+     html+='<tr class="cg-monthly-annual" data-cg-total-year="'+year+'"><th scope="row">Total do ano<small>'+year+'</small></th>'+annual.map(item=>cell(item)).join('')+cell(combined(annual),'cg-monthly-grand-total')+'</tr>';
+    }
+    return html;
    }).join('')+'</tbody></table>';
    if(html!==lastHTML){const top=box.scrollTop,left=box.scrollLeft;lastHTML=html;box.innerHTML=html;requestAnimationFrame(()=>{layout(reset);if(!reset){box.scrollTop=top;box.scrollLeft=left;}});}
    else if(reset)resetPosition();
