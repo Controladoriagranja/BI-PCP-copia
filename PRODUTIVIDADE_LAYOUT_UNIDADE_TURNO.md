@@ -11,14 +11,14 @@ aba Produtividade. Nada foi publicado, e não houve mudança em SQL, endpoints o
   Mantém meses nas linhas e total anual, rolagem vertical e cores do portal.
 - Em espaços menores, semanas e linhas mensais se reorganizam com rótulos de
   dia/empresa, sem ocultar valores. Não se usou `overflow-x:hidden` como solução.
-- Um único seletor Unidade / Turno, com nove opções: Ave Nova, Real Alimentos ou
-  Real + Ave Nova, cada uma com Todos os turnos, 1º turno ou 2º turno.
+- Um único seletor Unidade / Turno, com exatamente cinco opções, nesta ordem:
+  Ave Nova; 1° Turno - AN; 2° Turno - AN; Real Alimentos; Real Alimentos + Ave Nova.
 - A seleção filtra calendário, detalhamento, totais semanais, mensal e anual.
   Nas combinações, empresas continuam separadas, com consolidado apenas na coluna
   Total do mês/final anual já existente.
 - Grupo e Ano continuam aplicáveis ao mensal. Mês, Dia e Semana cheia mantêm seu
   comportamento anterior: ajustam o calendário, sem restringir os meses do acumulado.
-- Limpar filtros restaura Ave Nova — Todos os turnos e desmarca Semana cheia.
+- Limpar filtros restaura Ave Nova e desmarca Semana cheia.
 - Trocar para Rendimento restaura o nome Unidade, suas opções e seleção múltipla,
   além do layout e das tabelas anteriores. O CSS novo dos filtros só atua na
   classe de modo `cg-productivity-filters`.
@@ -34,36 +34,25 @@ Nova soma 1T+2T; seu mensal usa o diário comum consolidado. Real Alimentos usa 
 diário consolidado e complemento compatível já existente, sem somar registros
 consolidados com seus turnos.
 
-Um turno explícito só aceita `turno_codigo` correspondente e empresa identificada.
-Para a Real, consulta as fontes compatíveis do catálogo que tenham a coluna,
-incluindo diario_industria_turnos, diario_industria e dados_gerais. Registros sem
-turno não são convertidos em 1T/2T. Duplicações entre fontes são resolvidas pela
-mesma prioridade/MAX por empresa/data/turno.
-
-Os registros reais da Real enviados anteriormente são consolidados, sem turno.
-Se a API não disponibilizar registros identificados para uma seleção específica,
-a tela informa a ausência e não usa o consolidado como substituto.
-
-As metas disponíveis da Real são consolidadas (`PROD_RA_*`), não metas de turno.
-Na seleção de 1T/2T da Real, Aves/Peso podem ser exibidos quando identificados;
-Meta e Diferença ficam sem referência, com aviso. Não houve rateio de meta nem
-criação de valores. As metas por turno da Ave Nova continuam aplicáveis.
+As opções 1° Turno - AN e 2° Turno - AN só aceitam `turno_codigo` correspondente
+e empresa Ave Nova identificada. As metas por turno da Ave Nova continuam
+aplicáveis. Não há opções de turno individual da Real; seus valores e metas
+permanecem consolidados. Não houve rateio de meta nem criação de valores.
 
 ## Testes
 
 `tools/test_pcp_productivity_browser.py` monta o relatório real no Edge headless,
 com perfil isolado no workspace e API local simulada. Usa a amostra SQL de
-novembro para Ave Nova/consolidados e dados **sintéticos** de turnos da Real,
-um deles na tabela de turnos e outro no diário comum, para validar identificação.
-Também testa a ausência desses registros. Não acessa sessão do usuário ou API real.
+novembro para Ave Nova, turnos da Ave Nova e Real consolidada. Não acessa sessão
+do usuário ou API real. Confere os cinco nomes e sua ordem exata no seletor.
 
-Foram aprovadas as nove opções em viewports de **1366, 1440, 1920, 1024, 600 e
+Foram aprovadas as cinco opções em viewports de **1366, 1440, 1920, 1024, 600 e
 492 px**. Foram verificados:
 
 - Largura da página, dos dois relatórios e das células sem transbordamento lateral.
 - Números dentro dos limites dos cards; menu do seletor aberto sem expandir a página.
 - Mensal abaixo do calendário; meses e anual coerentes com cada seleção.
-- Empresas separadas e ausência de uso do consolidado como turno da Real.
+- Empresas separadas na opção Real Alimentos + Ave Nova.
 - Grupo, Dia, Semana cheia, setas sincronizadas com Mês e Limpar filtros.
 - Opções, seleção múltipla, marcação da tabela e estilo dos filtros de Rendimento
   preservados após alternar as abas.

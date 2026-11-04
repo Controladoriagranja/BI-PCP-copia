@@ -5,9 +5,8 @@ window.PcpCirurgico=(()=>{
  const headCompanies={'10':'Ave Nova','111':'Real Alimentos'};
  const headCompanyLabels={'10':'A.N.','111':'R.A.'};
  const productivityUnitOptions=[
-  ['10','Ave Nova — Todos os turnos',['10'],null],['1','Ave Nova — 1º turno',['10'],'1'],['2','Ave Nova — 2º turno',['10'],'2'],
-  ['111','Real Alimentos — Todos os turnos',['111'],null],['ra_1','Real Alimentos — 1º turno',['111'],'1'],['ra_2','Real Alimentos — 2º turno',['111'],'2'],
-  ['both','Real + Ave Nova — Todos os turnos',['10','111'],null],['both_1','Real + Ave Nova — 1º turno',['10','111'],'1'],['both_2','Real + Ave Nova — 2º turno',['10','111'],'2']
+  ['10','Ave Nova',['10'],null],['1','1° Turno - AN',['10'],'1'],['2','2° Turno - AN',['10'],'2'],
+  ['111','Real Alimentos',['111'],null],['both','Real Alimentos + Ave Nova',['10','111'],null]
  ];
  function headCompany(value){
   const text=String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();

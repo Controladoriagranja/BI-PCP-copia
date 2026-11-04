@@ -47,8 +47,9 @@ consulta registros identificados daquele turno e usa as metas compatíveis.
 Ano e Grupo continuam aplicáveis; Mês, Dia e Semana cheia continuam sem restringir
 o acumulado mensal. Uma mudança de Unidade / Turno invalida a consulta mensal.
 
-**Filtro Unidade / Turno:** seleção única, reutilizando o menu existente, com nove
-opções (Ave Nova, Real Alimentos ou ambas × Todos, 1º ou 2º turno).
+**Filtro Unidade / Turno:** seleção única, reutilizando o menu existente, com
+exatamente cinco opções: Ave Nova; 1° Turno - AN; 2° Turno - AN; Real Alimentos;
+Real Alimentos + Ave Nova. As opções de empresa usam seus consolidados existentes.
 Ave Nova é a seleção inicial e volta ao clicar em Limpar filtros; não há opção de
 selecionar todas ou deixar vazio em Produtividade. Trocar para Rendimento restaura
 sua seleção múltipla anterior. O título mostra o mês e a unidade/turno, por exemplo
@@ -71,11 +72,7 @@ empresa importada com a opção de 1º turno.
 
 Real Alimentos também aplica a prioridade Abate/Recepção, com MAX por empresa/dia,
 com `diario_industria` e o complemento `dados_gerais` quando confirmado pelo catálogo.
-Ao filtrar um turno da Real, só utiliza registros com `turno_codigo` correspondente
-nas fontes compatíveis do catálogo, incluindo `diario_industria_turnos`.
-Consolidados sem turno não são reaproveitados. Sem registros por turno, mostra a
-limitação. As metas disponíveis da Real são consolidadas; não são divididas
-artificialmente entre turnos, e Meta/Diferença permanecem sem referência nesse caso.
+Não há opções de turno da Real no seletor. Seus dados e metas permanecem consolidados.
 Essa preservação foi expressamente confirmada pelo usuário.
 
 ### Reconciliação com dados reais enviados pelo usuário
