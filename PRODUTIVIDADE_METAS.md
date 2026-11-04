@@ -24,7 +24,10 @@ em uma única linha A.N.; selecionar 1º ou 2º turno restringe a fonte e a meta
 pelo relatório, inclusive em semana cheia e no acumulado mensal.
 
 **Acumulado mensal:** a seleção única **Unidade / Turno** agora filtra o calendário,
-o mensal e o total anual. As opções Real + Ave Nova mantêm as empresas separadas.
+o mensal e o total anual. Real Alimentos + Ave Nova consolida dias, detalhamento
+e totais do calendário. Aves, Peso e Meta são somados; Diferença mantém os sinais
+dos saldos (equivalente a realizado total menos meta total). O mensal mantém as
+colunas das empresas e a coluna Total com as mesmas somas.
 O total da A.N. usa `pcp.diario_industria`, selecionando o maior registro de
 Cabeças por empresa/dia na seção escolhida pela mesma prioridade Abate/Recepção,
 somando esses valores no mês. Não há soma entre seções nem complemento de datas

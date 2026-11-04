@@ -37,7 +37,8 @@ const expected={
  '10':{name:'Ave Nova',days:[[101373,333330,120000,-18627],[120945,365885,120000,945]],total:[222318,699215,240000,-17682]},
  '1':{name:'Ave Nova — 1º turno',days:[[51699,168652,65000,-13301],[61545,191558,65000,-3455]],total:[113244,360210,130000,-16756]},
  '2':{name:'Ave Nova — 2º turno',days:[[49674,164678,55000,-5326],[59400,174327,55000,4400]],total:[109074,339005,110000,-926]},
- '111':{name:'Real Alimentos',days:[[74055,253435,80000,-5945],[68532,223670,80000,-11468]],total:[142587,477105,160000,-17413]}
+ '111':{name:'Real Alimentos',days:[[74055,253435,80000,-5945],[68532,223670,80000,-11468]],total:[142587,477105,160000,-17413]},
+ 'both':{name:'Real Alimentos + Ave Nova',days:[[175428,586765,200000,-24572],[189477,589555,200000,-10523]],total:[364905,1176320,400000,-35095]}
 };
 module.exports=(async()=>{
  const metas=await app.productivityTargets.load(get,periods,signal,false,fixture.limit);assert.equal(metas.length,17);
@@ -65,11 +66,11 @@ module.exports=(async()=>{
  check(cells[2],[364905,1176318,400000,-35095],'Ave Nova + Real Alimentos','Mensal novembro até 03/11');
  // Diferença real entre fontes: não corrigir artificialmente os pesos.
  assert.equal(expected['10'].total[1]-monthlyState.pesos.filter(r=>r.empresa_codigo==='10').reduce((sum,r)=>sum+r.peso_vivo,0),2);
- assert.equal(checks.length,76);
+ assert.equal(checks.length,92);
  if(process.env.PCP_AUDIT_OUTPUT){
   const out=path.resolve(process.env.PCP_AUDIT_OUTPUT);fs.mkdirSync(path.dirname(out),{recursive:true});
   const columns=Object.keys(checks[0]),escape=v=>'"'+String(v).replaceAll('"','""')+'"';
   fs.writeFileSync(out,'\uFEFF'+[columns.map(escape).join(';'),...checks.map(r=>columns.map(c=>escape(r[c])).join(';'))].join('\n')+'\n','utf8');
  }
- console.log('OK: 76 comparações locais nos dias, semanas, totais do calendário e mensal; quatro opções de unidade; 17 metas de novembro; diferença de 2 kg entre fontes preservada. API real não consultada.');
+ console.log('OK: 92 comparações locais nos dias, semanas, totais do calendário e mensal; cinco opções, incluindo consolidação de empresas e diferenças com sinais; 17 metas de novembro; diferença de 2 kg entre fontes preservada. API real não consultada.');
 })();

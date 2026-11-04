@@ -622,7 +622,8 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 #cgProdutividade .cg-monthly-pivot .cg-prod-reference>span{flex-wrap:wrap}
 #cgProdutividade .cg-monthly-pivot .cg-prod-weight{font-size:12px}
 #cgProdutividade .cg-monthly-pivot .cg-prod-weight strong{font-size:13px}
-#cgProdutividade .cg-monthly-pivot tbody .cg-monthly-current>th{background:color-mix(in srgb,var(--accent) 12%,var(--card))}
+#cgProdutividade .cg-monthly-pivot tbody tr[data-cg-month-period]:nth-child(odd)>:not(.cg-monthly-total){background:var(--card)}
+#cgProdutividade .cg-monthly-pivot tbody tr[data-cg-month-period]:nth-child(even)>:not(.cg-monthly-total){background:var(--muted)}
 #cgProdutividade .cg-monthly-pivot .cg-monthly-future{color:var(--muted-foreground)}
 #cgProdutividade .cg-monthly-pivot .cg-monthly-total,
 #cgProdutividade .cg-monthly-pivot .cg-monthly-annual>*,

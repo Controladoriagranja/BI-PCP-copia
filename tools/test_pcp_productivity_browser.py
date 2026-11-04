@@ -47,7 +47,7 @@ TEST = r'''
   flag('produtividade').click();await flush();
   assert(JSON.stringify([...unit.options].map(o=>o.textContent))===JSON.stringify(['Ave Nova','1° Turno - AN','2° Turno - AN','Real Alimentos','Real Alimentos + Ave Nova']),'Cinco opções com nomes e ordem exatos');
   assert(unit.closest('label').firstChild.textContent==='Unidade / Turno','Nome do filtro único');
-  const expected={'10':[222318],'1':[113244],'2':[109074],'111':[142587],'both':[222318,142587]};
+  const expected={'10':[222318],'1':[113244],'2':[109074],'111':[142587],'both':[364905]};
   const parse=element=>Number(element.textContent.replace(/[^\d-]/g,''));
   function checkLayout(value){
    const root=document.getElementById('cgProdutividade'),calendar=root.firstElementChild,monthly=root.lastElementChild;
@@ -78,15 +78,35 @@ TEST = r'''
    const monthRow=document.querySelector('[data-cg-month-period="2026-11"]');
    const annualRow=document.querySelector('[data-cg-total-year="2026"]');
    const values=row=>[...row.querySelectorAll('.cg-monthly-quantity>strong')].map(parse);
-   const monthlyExpected=totals.length===2?[...totals,totals.reduce((a,b)=>a+b,0)]:totals;
+   const monthlyExpected=value==='both'?[222318,142587,364905]:totals;
    assert(JSON.stringify(values(monthRow))===JSON.stringify(monthlyExpected),'Mensal '+value+': '+values(monthRow));
    assert(JSON.stringify(values(annualRow))===JSON.stringify(monthlyExpected),'Anual '+value);
+   if(value==='both'){
+    const stripes=[...document.querySelectorAll('.cg-monthly-pivot tr[data-cg-month-period]')].slice(0,3);
+    const backgrounds=stripes.map(row=>[...row.children].filter(cell=>!cell.classList.contains('cg-monthly-total')).map(cell=>getComputedStyle(cell).backgroundColor));
+    assert(backgrounds.every(row=>row.every(color=>color===row[0])),'Cada mês deve ter fundo uniforme, incluindo a coluna Mês');
+    assert(backgrounds[0][0]!==backgrounds[1][0]&&backgrounds[0][0]===backgrounds[2][0],'Alternância branco/bege entre meses');
+    const totalColors=stripes.map(row=>getComputedStyle(row.querySelector('.cg-monthly-total')).backgroundColor);
+    assert(totalColors.every(color=>color===totalColors[0])&&totalColors[0]!==backgrounds[0][0],'Preservar preenchimento da coluna Total do mês');
+    const day3=document.querySelector('[data-cg-day="2026-11-03"]');
+    assert(day3.querySelectorAll('.cg-production-heads>span').length===1,'Exibir um total consolidado por dia');
+    assert(parse(day3.querySelector('.cg-production-heads>span>strong'))===189477,'Somar aves por dia');
+    assert(parse(day3.querySelector('.cg-prod-reference>span:first-child>span:last-child'))===200000,'Somar metas por dia');
+    assert(parse(day3.querySelector('.cg-prod-reference strong'))===-10523,'Somar diferença positiva e negativa sem perder sinais');
+    assert(parse(day3.querySelector('.cg-production-day-weight strong'))===589555,'Somar pesos por dia');
+    day3.click();await flush();
+    const detail=document.querySelector('.cg-production-detail');
+    assert(!detail.hidden&&detail.querySelectorAll('dl>div').length===1,'Detalhamento também consolidado');
+    assert(parse(detail.querySelector('dd>strong'))===189477,'Aves no detalhamento');
+    assert(parse(detail.querySelector('.cg-prod-reference strong'))===-10523,'Diferença no detalhamento');
+    day3.click();await flush();
+   }
    results.push({unit:value,...checkLayout(value)});
   }
   // Dia limita o calendário, enquanto o mensal mantém os meses completos do recorte.
   unit.value='both';unit.dispatchEvent(new Event('change',{bubbles:true}));await flush();
   const day=document.getElementById('cgDia');day.value='2026-11-02';day.dispatchEvent(new Event('change',{bubbles:true}));await flush();
-  assert(JSON.stringify([...document.querySelectorAll('[data-cg-total="month"] .cg-production-heads>span>strong')].map(parse))===JSON.stringify([101373,74055]),'Filtro de dia no calendário');
+  assert(JSON.stringify([...document.querySelectorAll('[data-cg-total="month"] .cg-production-heads>span>strong')].map(parse))===JSON.stringify([175428]),'Filtro de dia no calendário com empresas consolidadas');
   assert(parse(document.querySelector('[data-cg-month-period="2026-11"] .cg-monthly-quantity>strong'))===222318,'Dia preserva recorte mensal');
   day.value='';day.dispatchEvent(new Event('change',{bubbles:true}));
   const group=document.getElementById('cgGrupo');group.value='familias';group.dispatchEvent(new Event('change',{bubbles:true}));await flush();

@@ -83,9 +83,10 @@ disponível e `/api/pcp/dados/metas`. Nenhuma rota foi alterada.
 
 ## Validação e limites
 
-- `tools/test_pcp_productivity_november.cjs` executa 76 comparações locais da
-  renderização contra valores esperados da amostra SQL: 32 indicadores diários,
-  32 nos totais semanais/do calendário e 12 no mensal das duas empresas/consolidado.
+- `tools/test_pcp_productivity_november.cjs` executa 92 comparações locais da
+  renderização contra valores esperados da amostra SQL: 40 indicadores diários,
+  40 nos totais semanais/do calendário e 12 no mensal das duas empresas/consolidado,
+  incluindo a exibição consolidada Real Alimentos + Ave Nova e saldos com sinais.
   Resultado: **zero divergências locais após a correção**.
 - A API é simulada com os registros SQL, inclusive filtros e paginação de três
   registros. Isso exercita os mesmos leitores e renderizadores do relatório,

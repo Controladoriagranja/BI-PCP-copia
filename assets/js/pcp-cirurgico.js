@@ -3,7 +3,8 @@ window.PcpCirurgico=(()=>{
  const esc=ApiScreen.escape,pct=v=>v==null?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
  const cols={'1':'1º turno - AN','2':'2º turno - AN','10':'Ave Nova - AN','111':'Real Alimentos'};
  const headCompanies={'10':'Ave Nova','111':'Real Alimentos'};
- const headCompanyLabels={'10':'A.N.','111':'R.A.'};
+ const headCompanyLabels={'10':'A.N.','111':'R.A.','both':'A.N. + R.A.'};
+ const combinedCompanyLabel='Real Alimentos + Ave Nova';
  const productivityUnitOptions=[
   ['10','Ave Nova',['10'],null],['1','1° Turno - AN',['10'],'1'],['2','2° Turno - AN',['10'],'2'],
   ['111','Real Alimentos',['111'],null],['both','Real Alimentos + Ave Nova',['10','111'],null]
@@ -320,8 +321,9 @@ window.PcpCirurgico=(()=>{
    return companies.map(code=>({...rows.find(row=>row.empresa_codigo===code)||{data:date,empresa_codigo:code,empresa:headCompanies[code],quantidade_cabecas:null},peso_vivo:weights.find(row=>row.empresa_codigo===code)?.peso_vivo??null}));
   }
   function headsMarkup(rows,showWeight=true){
+   rows=displayRows(rows);
    return rows.length?'<span class="cg-production-heads">'+rows.map(row=>{
-    const rating=productivityTargets.grade(row.empresa_codigo,row._days||[row],getHeads().metas||[],calendarUnit());
+    const rating=row._rating||productivityTargets.grade(row.empresa_codigo,row._days||[row],getHeads().metas||[],calendarUnit());
     return '<span><span title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+'</span><strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(formatHeads(rating.meta))+' aves"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+' <small>'+birdUnit(row.quantidade_cabecas)+'</small></strong>'+productivityReferenceMarkup(row.quantidade_cabecas,rating)+(showWeight?productivityWeightMarkup(row.peso_vivo):'')+'</span>';
    }).join('')+'</span>':'<span class="cg-production-empty" aria-hidden="true">—</span>';
   }
@@ -335,8 +337,16 @@ window.PcpCirurgico=(()=>{
    });
   }
   function totalCell(dates,kind,label){
-   const rows=totals(dates),weights=productivityHeaderWeights(rows);
+   const rows=displayRows(totals(dates)),weights=productivityHeaderWeights(rows);
    return '<td class="cg-production-total" data-cg-total="'+kind+'" data-cg-label="'+esc(label)+'" aria-label="'+esc(label)+'">'+(weights&&rows.length===1?'<span class="cg-production-total-header">'+weights+'</span>':'')+headsMarkup(rows,rows.length>1)+'</td>';
+  }
+  function displayRows(rows){
+   if(calendarUnit()!=='both'||!rows.length||rows[0].empresa_codigo==='both')return rows;
+   const sum=field=>{const values=rows.map(row=>row[field]).filter(Number.isFinite);return values.length?values.reduce((total,value)=>total+value,0):null;};
+   const value=sum('quantidade_cabecas');
+   const ratings=rows.filter(row=>Number.isFinite(row.quantidade_cabecas)).map(row=>productivityTargets.grade(row.empresa_codigo,row._days||[row],getHeads().metas||[],calendarUnit()));
+   const meta=ratings.length&&ratings.every(rating=>Number.isFinite(rating.meta))?ratings.reduce((total,rating)=>total+rating.meta,0):null;
+   return [{empresa_codigo:'both',empresa:combinedCompanyLabel,quantidade_cabecas:value,peso_vivo:sum('peso_vivo'),_rating:{meta,className:meta==null?'':value>=meta?'cg-prod-good':'cg-prod-bad'}}];
   }
   function emptyMessage(date){
    if(date&&getHeads().limit&&date>getHeads().limit)return 'Dados disponíveis até '+getHeads().limit.split('-').reverse().join('/')+' (D−1).';
@@ -361,9 +371,9 @@ window.PcpCirurgico=(()=>{
   function renderDetail(){
    detail.hidden=!selectedDay;
    if(selectedDay){
-    const date=new Date(selectedDay+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}),rows=dayHeads(selectedDay);
+    const date=new Date(selectedDay+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}),rows=displayRows(dayHeads(selectedDay));
     detail.innerHTML='<header><h2>Detalhamento do dia · '+esc(date)+'</h2></header>'+(rows.length?'<dl class="cg-production-heads-detail">'+rows.map(row=>{
-     const rating=productivityTargets.grade(row.empresa_codigo,[row],getHeads().metas||[],calendarUnit());
+     const rating=row._rating||productivityTargets.grade(row.empresa_codigo,[row],getHeads().metas||[],calendarUnit());
      return '<div><dt title="'+esc(row.empresa)+'">'+esc(headCompanyLabels[row.empresa_codigo]||row.empresa)+' · Aves</dt><dd><strong'+(rating.className?' class="'+rating.className+'"':'')+'>'+esc(formatHeads(row.quantidade_cabecas))+'</strong>'+productivityReferenceMarkup(row.quantidade_cabecas,rating)+productivityWeightMarkup(row.peso_vivo)+'</dd></div>';
     }).join('')+'</dl><p class="cg-production-notice">Valores de aves por empresa e dia, conforme os registros da fonte.</p>':'<p class="cg-production-notice">'+esc(emptyMessage(selectedDay))+'</p>');
    }
@@ -385,7 +395,7 @@ window.PcpCirurgico=(()=>{
      if(!date)return '<td class="cg-production-outside" aria-hidden="true"></td>';
      const day=Number(date.slice(8)),outside=date.slice(0,7)!==key,allowed=PcpMulti.includes(fields.Dia.value,date);
      if(allowed)visibleDays.add(date);
-     const rows=allowed?dayHeads(date):[],summary=rows.map(row=>row.empresa+': '+(row.quantidade_cabecas==null?'aves sem registro':formatHeads(row.quantidade_cabecas)+' '+birdUnit(row.quantidade_cabecas))+(row.peso_vivo==null?'':', peso vivo '+formatHeads(row.peso_vivo)+' kg')).join('; ');
+     const rows=displayRows(allowed?dayHeads(date):[]),summary=rows.map(row=>row.empresa+': '+(row.quantidade_cabecas==null?'aves sem registro':formatHeads(row.quantidade_cabecas)+' '+birdUnit(row.quantidade_cabecas))+(row.peso_vivo==null?'':', peso vivo '+formatHeads(row.peso_vivo)+' kg')).join('; ');
      const bothEmpty=state.status==='ready'&&['10','111'].every(code=>(state.rows.find(row=>row.data===date&&row.empresa_codigo===code)?.quantidade_cabecas??0)===0);
      const classes=[outside?'cg-production-adjacent':'',bothEmpty?'cg-production-rest':''].filter(Boolean).join(' ');
      return '<td data-cg-label="'+esc(weekdays[new Date(date+'T00:00:00Z').getUTCDay()])+'"'+(classes?' class="'+classes+'"':'')+'><button type="button" data-cg-day="'+date+'" aria-pressed="false" aria-label="'+esc(day+' de '+(outside?monthName(Number(date.slice(0,4)),Number(date.slice(5,7))):label)+' · '+(allowed?(summary||emptyMessage(date)):'Fora do filtro de dia'))+'"'+(allowed?'':' disabled')+'>'+productivityDayHeader(day,date,outside,rows.length>1?[]:rows)+headsMarkup(rows,rows.length>1)+'</button></td>';

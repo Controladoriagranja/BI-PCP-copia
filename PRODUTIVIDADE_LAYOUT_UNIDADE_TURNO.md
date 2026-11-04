@@ -6,7 +6,9 @@ aba Produtividade. Nada foi publicado, e não houve mudança em SQL, endpoints o
 ## Comportamento
 
 - Calendário em toda a largura, com segunda a sábado, Total semanal e os totais
-  existentes. Células crescem verticalmente para separar A.N. e R.A.
+  existentes. Na seleção Real Alimentos + Ave Nova, cada dia, detalhamento e total
+  mostram um único consolidado A.N. + R.A., somando Aves, Peso e Meta. Diferença
+  soma os saldos com seus sinais, equivalente a Aves totais menos Meta total.
 - Acumulado mensal abaixo do calendário, em toda a largura, sem rolagem lateral.
   Mantém meses nas linhas e total anual, rolagem vertical e cores do portal.
 - Em espaços menores, semanas e linhas mensais se reorganizam com rótulos de
@@ -14,8 +16,10 @@ aba Produtividade. Nada foi publicado, e não houve mudança em SQL, endpoints o
 - Um único seletor Unidade / Turno, com exatamente cinco opções, nesta ordem:
   Ave Nova; 1° Turno - AN; 2° Turno - AN; Real Alimentos; Real Alimentos + Ave Nova.
 - A seleção filtra calendário, detalhamento, totais semanais, mensal e anual.
-  Nas combinações, empresas continuam separadas, com consolidado apenas na coluna
-  Total do mês/final anual já existente.
+  No mensal, as colunas das empresas e Total do mês/final anual continuam
+  disponíveis; a coluna Total soma os indicadores das duas empresas.
+- As linhas dos meses alternam branco/bege em todas as células comuns, inclusive
+  Mês; Total do mês conserva seu vinho claro, assim como o total anual.
 - Grupo e Ano continuam aplicáveis ao mensal. Mês, Dia e Semana cheia mantêm seu
   comportamento anterior: ajustam o calendário, sem restringir os meses do acumulado.
 - Limpar filtros restaura Ave Nova e desmarca Semana cheia.
@@ -52,7 +56,10 @@ Foram aprovadas as cinco opções em viewports de **1366, 1440, 1920, 1024, 600 
 - Largura da página, dos dois relatórios e das células sem transbordamento lateral.
 - Números dentro dos limites dos cards; menu do seletor aberto sem expandir a página.
 - Mensal abaixo do calendário; meses e anual coerentes com cada seleção.
-- Empresas separadas na opção Real Alimentos + Ave Nova.
+- Consolidação por dia, detalhamento e totais em Real Alimentos + Ave Nova,
+  incluindo saldo negativo resultante de uma diferença positiva e outra negativa.
+- Fundo de mês uniforme entre Mês e empresas, alternância branco/bege e
+  preenchimento de Total do mês preservado.
 - Grupo, Dia, Semana cheia, setas sincronizadas com Mês e Limpar filtros.
 - Opções, seleção múltipla, marcação da tabela e estilo dos filtros de Rendimento
   preservados após alternar as abas.
