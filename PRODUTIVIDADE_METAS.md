@@ -23,11 +23,13 @@ em uma única linha A.N.; selecionar 1º ou 2º turno restringe a fonte e a meta
 `data_referencia` é a data civil. O limite permanece o `data_limite` D−1 retornado
 pelo relatório, inclusive em semana cheia e no acumulado mensal.
 
-**Acumulado mensal:** a seleção única **Unidade / Turno** agora filtra o calendário,
-o mensal e o total anual. Real Alimentos + Ave Nova consolida dias, detalhamento
-e totais do calendário. Aves, Peso e Meta são somados; Diferença mantém os sinais
-dos saldos (equivalente a realizado total menos meta total). O mensal mantém as
-colunas das empresas e a coluna Total com as mesmas somas.
+**Acumulado mensal — regra obrigatória:** sempre mostra os 12 meses do ano
+selecionado, Ave Nova, Real Alimentos e o total das duas. Unidade / Turno, Mês,
+Dia e Semana cheia não restringem a consulta, as colunas, os valores ou as metas
+do acumulado. A seleção única Unidade / Turno controla apenas o calendário.
+Real Alimentos + Ave Nova consolida dias, detalhamento e totais do calendário.
+Aves, Peso e Meta são somados; Diferença mantém os sinais dos saldos
+(equivalente a realizado total menos meta total).
 O total da A.N. usa `pcp.diario_industria`, selecionando o maior registro de
 Cabeças por empresa/dia na seção escolhida pela mesma prioridade Abate/Recepção,
 somando esses valores no mês. Não há soma entre seções nem complemento de datas
@@ -45,10 +47,10 @@ tabela ocupa a largura do card abaixo do calendário, sem rolagem horizontal.
 Em telas estreitas, reorganiza os blocos mantendo os valores e os rótulos.
 
 A rotina de leitura seleciona o maior registro de Cabeças por empresa/dia
-na seção escolhida também no diário comum. Ao selecionar um turno, o mensal
-consulta registros identificados daquele turno e usa as metas compatíveis.
-Ano e Grupo continuam aplicáveis; Mês, Dia e Semana cheia continuam sem restringir
-o acumulado mensal. Uma mudança de Unidade / Turno invalida a consulta mensal.
+na seção escolhida também no diário comum. O mensal sempre usa os consolidados
+das duas empresas e suas metas completas, sem aplicar turnos do calendário.
+Ano e Grupo continuam aplicáveis; Unidade / Turno, Mês, Dia e Semana cheia não
+restringem o acumulado e não provocam uma nova consulta mensal por si mesmos.
 
 **Filtro Unidade / Turno:** seleção única, reutilizando o menu existente, com
 exatamente cinco opções: Ave Nova; 1° Turno - AN; 2° Turno - AN; Real Alimentos;
@@ -105,9 +107,8 @@ somados ou usados como substitutos. O peso utiliza maior valor por empresa/data/
 turno, sem restringir seção, preservando o histórico de Recepção e evitando contar
 novamente Abate/Compra/Recepção. No calendário A.N. total, soma os maiores valores
 dos dois turnos; selecionar 1T/2T mantém apenas o respectivo turno. R.A. segue seu
-diário comum na seleção Todos os turnos. O mensal usa o diário comum para os
-consolidados e os registros identificados por turno para seleções específicas,
-exibindo apenas as empresas da seleção Unidade / Turno.
+diário comum. O mensal sempre usa os consolidados do diário comum das duas
+empresas, independentemente da seleção Unidade / Turno do calendário.
 
 | Data | A.N. 1T (kg) | A.N. 2T (kg) | A.N. total/diário (kg) | R.A. diário (kg) |
 |---|---:|---:|---:|---:|

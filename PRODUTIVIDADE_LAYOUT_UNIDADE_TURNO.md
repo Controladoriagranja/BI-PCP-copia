@@ -15,15 +15,16 @@ aba Produtividade. Nada foi publicado, e não houve mudança em SQL, endpoints o
   dia/empresa, sem ocultar valores. Não se usou `overflow-x:hidden` como solução.
 - Um único seletor Unidade / Turno, com exatamente cinco opções, nesta ordem:
   Ave Nova; 1° Turno - AN; 2° Turno - AN; Real Alimentos; Real Alimentos + Ave Nova.
-- A seleção filtra calendário, detalhamento, totais semanais, mensal e anual.
-  No mensal, as colunas das empresas e Total do mês/final anual continuam
-  disponíveis; a coluna Total soma os indicadores das duas empresas.
+- A seleção filtra apenas calendário, detalhamento e seus totais semanais e do
+  período. O acumulado mensal mantém obrigatoriamente os 12 meses do ano selecionado,
+  as colunas Ave Nova, Real Alimentos e Total do mês, além dos totais anuais.
+  Unidade / Turno não altera as colunas, valores, metas ou consulta do acumulado.
 - As linhas dos meses alternam branco/bege em todas as células comuns, inclusive
   Mês e Total do mês. Somente a linha Total do ano mantém o vinho claro.
 - Calendário e acumulado têm margem lateral de 6 px por lado para deixar uma
   pequena folga de rolagem junto aos cards.
-- Grupo e Ano continuam aplicáveis ao mensal. Mês, Dia e Semana cheia mantêm seu
-  comportamento anterior: ajustam o calendário, sem restringir os meses do acumulado.
+- Grupo e Ano continuam aplicáveis ao mensal. Unidade / Turno, Mês, Dia e Semana
+  cheia ajustam o calendário, sem restringir os meses ou empresas do acumulado.
 - Limpar filtros restaura Ave Nova e desmarca Semana cheia.
 - Trocar para Rendimento restaura o nome Unidade, suas opções e seleção múltipla,
   além do layout e das tabelas anteriores. O CSS novo dos filtros só atua na
@@ -57,7 +58,8 @@ Foram aprovadas as cinco opções em viewports de **1366, 1440, 1920, 1024, 600 
 
 - Largura da página, dos dois relatórios e das células sem transbordamento lateral.
 - Números dentro dos limites dos cards; menu do seletor aberto sem expandir a página.
-- Mensal abaixo do calendário; meses e anual coerentes com cada seleção.
+- Mensal abaixo do calendário; 12 meses, Ave Nova, Real Alimentos e total das duas
+  em todas as cinco seleções de Unidade / Turno, com valores e metas invariantes.
 - Consolidação por dia, detalhamento e totais em Real Alimentos + Ave Nova,
   incluindo saldo negativo resultante de uma diferença positiva e outra negativa.
 - Fundo de mês uniforme entre Mês, empresas e Total do mês, alternância branco/bege,

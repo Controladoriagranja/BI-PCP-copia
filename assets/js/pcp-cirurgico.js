@@ -443,9 +443,9 @@ window.PcpCirurgico=(()=>{
   function resetPosition(){requestAnimationFrame(()=>layout(true));}
   function render(){
    if(host.closest('[hidden]'))return;
-   const data=getData(),months=periods(),units=fields.Unidade?.value||'',groupAllowed=PcpMulti.includes(fields.Grupo.value,'producao'),keys=selectedHeadCompanies(units),sums=new Map(),dailyRows=new Map(),weights=new Map();
-   const limitation=data.status==='ready'?productivityTurnNotice(units,data.rows,data.pesos):'';
-   status.hidden=data.status!=='loading'&&data.status!=='error'&&!limitation;
+   // O acumulado sempre mostra as duas empresas, sem o filtro Unidade / Turno do calendário.
+   const data=getData(),months=periods(),units='',groupAllowed=PcpMulti.includes(fields.Grupo.value,'producao'),keys=['10','111'],sums=new Map(),dailyRows=new Map(),weights=new Map();
+   status.hidden=data.status!=='loading'&&data.status!=='error';
    if(data.status==='ready'&&groupAllowed&&data.limit){
     for(const row of data.rows){
      if(row.data>data.limit||row.quantidade_cabecas==null||!Number.isFinite(row.quantidade_cabecas))continue;
@@ -458,7 +458,6 @@ window.PcpCirurgico=(()=>{
     }
    }
    status.textContent=!groupAllowed?'Aves pertencem ao grupo Produção e perdas.':data.status==='loading'?'Consultando acumulados mensais…':data.status==='error'?'Não foi possível consultar o acumulado mensal. Clique em Produtividade para tentar novamente.':'Totais de aves por mês'+(data.limit?' · até '+data.limit.split('-').reverse().join('/')+' (D−1)':'')+'. Mês, Dia e Semana cheia não alteram esta tabela. Role verticalmente para consultar os meses de janeiro a dezembro.';
-   if(limitation)status.textContent=limitation;
    const signature=months.map(p=>p.year+'-'+p.month).join(','),reset=signature!==lastPeriods;lastPeriods=signature;
    if(!months.length){box.innerHTML='<p class="pcp-report-notice">Sem meses disponíveis para o ano selecionado.</p>';lastHTML='';return;}
    function summary(code,periods){
@@ -568,7 +567,8 @@ window.PcpCirurgico=(()=>{
     if(monthlyController){monthlyGeneration++;monthlyController.abort();monthlyController=null;}
     monthlyKey='';monthlyState={status:limit?'idle':loading?'loading':'error',rows:[],limit};monthly.render();return;
    }
-   const periods=monthly.periods(),units=fields.Unidade.value,key=JSON.stringify([periods,units,limit]);
+   // Consolidado anual das duas empresas; Unidade / Turno só controla o calendário.
+   const periods=monthly.periods(),units='',key=JSON.stringify([periods,units,limit]);
    if(!force&&monthlyKey===key){monthly.render();return;}
    monthlyKey=key;const id=++monthlyGeneration;monthlyController?.abort();monthlyController=new AbortController();
    monthlyState={status:'loading',rows:[],limit};monthly.render();

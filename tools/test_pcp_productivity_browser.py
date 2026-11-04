@@ -79,7 +79,10 @@ TEST = r'''
    const monthRow=document.querySelector('[data-cg-month-period="2026-11"]');
    const annualRow=document.querySelector('[data-cg-total-year="2026"]');
    const values=row=>[...row.querySelectorAll('.cg-monthly-quantity>strong')].map(parse);
-   const monthlyExpected=value==='both'?[222318,142587,364905]:totals;
+   const monthlyExpected=[222318,142587,364905];
+   const monthlyTable=document.querySelector('.cg-monthly-pivot');
+   assert(JSON.stringify([...monthlyTable.querySelectorAll('thead th')].map(cell=>cell.textContent))===JSON.stringify(['Mês','Ave Nova','Real Alimentos','Total do mês']),'Mensal sempre com as duas empresas e total, seleção '+value);
+   assert(monthlyTable.querySelectorAll('[data-cg-month-period]').length===12,'Mensal sempre com os 12 meses, seleção '+value);
    assert(JSON.stringify(values(monthRow))===JSON.stringify(monthlyExpected),'Mensal '+value+': '+values(monthRow));
    assert(JSON.stringify(values(annualRow))===JSON.stringify(monthlyExpected),'Anual '+value);
    if(value==='both'){
