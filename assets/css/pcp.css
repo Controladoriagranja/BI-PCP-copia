@@ -582,16 +582,9 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
  .pcp-report[data-page="report-g8"] .cg-filter-actions fieldset{flex:none}
 }
 
-/* Em monitores amplos, calendário e mensal dividem a primeira linha sem reduzir a fonte. */
-@media(min-width:1600px){
- #cgProdutividade{grid-template-columns:minmax(0,1fr) minmax(420px,480px);align-items:start;gap:14px}
- #cgProdutividade>article:first-child{grid-column:1;grid-row:1;min-width:0}
- #cgProdutividade>article:last-child{grid-column:2;grid-row:1;min-width:0}
- #cgProdutividade>.cg-production-detail{grid-column:1/-1;grid-row:2}
-}
-@media(max-width:1599px){
- #cgProdutividade{grid-template-columns:minmax(0,1fr)}
-}
+/* Produtividade: calendário principal e acumulado abaixo em toda a largura. */
+#cgProdutividade{grid-template-columns:minmax(0,1fr);container-type:inline-size}
+#cgProdutividade>article{min-width:0;max-width:100%}
 @media(max-width:767px){
  #cgProdutividade .cg-production-grid button{min-height:110px;padding:8px}
  #cgProdutividade .cg-production-header-tools{justify-content:flex-start;margin-left:0}
@@ -611,7 +604,7 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 
 /* Nova modificação de 29/10/2026: mensal pivotado, janeiro a dezembro nas linhas. */
 #cgProdutividade .cg-monthly-scroll{cursor:auto;max-height:min(720px,75dvh);scrollbar-gutter:stable;overscroll-behavior:contain}
-#cgProdutividade .cg-monthly-pivot{width:100%;min-width:650px;table-layout:fixed}
+#cgProdutividade .cg-monthly-pivot{width:100%;min-width:0;table-layout:fixed}
 #cgProdutividade .cg-monthly-pivot col:first-child{width:78px}
 #cgProdutividade .cg-monthly-pivot col:not(:first-child){width:auto}
 #cgProdutividade .cg-monthly-pivot thead th{position:sticky;top:0;z-index:5;background:var(--card);font-size:13px;text-align:center;white-space:normal;padding:8px 5px}
@@ -637,14 +630,51 @@ body.pcp-report[data-page="report-g7"] .checkbox-multiselect-trigger{min-height:
 #cgProdutividade .cg-monthly-pivot .cg-monthly-annual>*{border-top:2px solid color-mix(in srgb,var(--primary) 25%,var(--border))}
 #cgProdutividade .cg-monthly-pivot .cg-monthly-annual>th{font-size:12px;font-weight:700}
 #cgProdutividade .cg-monthly-pivot .cg-monthly-grand-total{box-shadow:inset 1px 0 0 var(--border)}
-@media(min-width:1600px){
- #cgProdutividade>article:last-child{align-self:stretch;contain:size;min-height:0;display:flex;flex-direction:column;overflow:hidden}
- #cgProdutividade>article:last-child>header{flex:0 0 auto}
- #cgProdutividade .cg-production-monthly{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
- #cgProdutividade .cg-monthly-scroll{flex:1 1 auto;min-height:0;max-height:none}
-}
 
 /* Nova modificação de 29/10/2026: totais sem títulos repetidos, com peso no topo. */
 #cgProdutividade .cg-production-total-header{display:grid;gap:3px;min-height:28px;align-content:center;margin:0 0 5px}
 #cgProdutividade .cg-production-total-header .cg-production-day-weight{justify-content:space-between}
 #cgProdutividade .cg-monthly-pivot td>.cg-prod-weight:first-child{margin-top:0;margin-bottom:5px;padding-top:0;padding-bottom:4px;border-top:0;border-bottom:1px solid var(--border)}
+
+/* Ajustes restritos à seleção Produtividade; Rendimento mantém seu layout. */
+.pcp-report[data-page="report-g8"] .cg-filters.cg-productivity-filters{display:block}
+.pcp-report[data-page="report-g8"] .cg-productivity-filters>.pcp-comparativo-filter-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.pcp-report[data-page="report-g8"] .cg-productivity-filters>.pcp-comparativo-filter-head>h2{margin:0}
+.pcp-report[data-page="report-g8"] .cg-productivity-filters>.cg-filter-row{display:flex;flex-wrap:wrap}
+.pcp-report[data-page="report-g8"] .cg-productivity-filters .cg-filter-row>.cg-filter-grid{display:flex;flex-wrap:wrap;flex:1 1 850px;max-width:none;gap:12px}
+.pcp-report[data-page="report-g8"] .cg-productivity-filters .cg-filter-grid>label{flex:1 1 130px;min-width:0}
+.pcp-report[data-page="report-g8"] .cg-productivity-filters .cg-filter-grid>label:last-child{flex:2 1 255px}
+.pcp-report[data-page="report-g8"] .cg-productivity-filters .cg-filter-row>.cg-filter-actions{flex:1 1 330px;flex-wrap:wrap}
+.pcp-report[data-page="report-g8"] .cg-productivity-filters .pcp-select-multi{min-width:0;max-width:100%}
+#cgProdutividade .cg-production-scroll{overflow:visible;max-width:100%}
+#cgProdutividade .cg-production-grid{min-width:0;width:100%}
+#cgProdutividade .cg-production-grid button{height:100%;min-width:0}
+#cgProdutividade .cg-production-heads>span{min-width:0;width:100%}
+#cgProdutividade .cg-production-heads>span+span{padding-top:8px;border-top:1px solid var(--border)}
+#cgProdutividade .cg-production-day-header{flex-wrap:wrap}
+#cgProdutividade .cg-production-day-weight{max-width:100%;min-width:0}
+#cgProdutividade .cg-production-day-weight>span{white-space:normal}
+#cgProdutividade .cg-production-total .cg-production-heads{width:100%}
+#cgProdutividade .cg-monthly-scroll{max-height:min(1000px,85dvh)}
+#cgProdutividade .cg-monthly-pivot th,#cgProdutividade .cg-monthly-pivot td{min-width:0;max-width:none;overflow-wrap:normal}
+#cgProdutividade .cg-monthly-pivot td>.cg-prod-reference{max-width:none}
+
+/* En telas estreitas as semanas e meses se reorganizam, sem ocultar valores. */
+@container(max-width:760px){
+ #cgProdutividade .cg-production-grid thead{display:none}
+ #cgProdutividade .cg-production-grid,#cgProdutividade .cg-production-grid tbody,#cgProdutividade .cg-production-grid tfoot{display:block}
+ #cgProdutividade .cg-production-grid tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ #cgProdutividade .cg-production-grid td{display:block;min-width:0}
+ #cgProdutividade .cg-production-grid td.cg-production-outside{display:none}
+ #cgProdutividade .cg-production-grid td::before{content:attr(data-cg-label);display:block;padding:6px 8px;font-size:12px;color:var(--muted-foreground);background:var(--secondary)}
+ #cgProdutividade .cg-production-grid td.cg-production-total:last-child{grid-column:1/-1}
+}
+@container(max-width:520px){
+ #cgProdutividade .cg-monthly-pivot,#cgProdutividade .cg-monthly-pivot tbody{display:block;width:100%}
+ #cgProdutividade .cg-monthly-pivot thead,#cgProdutividade .cg-monthly-pivot colgroup{display:none}
+ #cgProdutividade .cg-monthly-pivot tbody tr{display:grid;grid-template-columns:minmax(0,1fr)}
+ #cgProdutividade .cg-monthly-pivot tbody tr>th:first-child{position:static;width:auto;min-width:0;max-width:none;text-align:left}
+ #cgProdutividade .cg-monthly-pivot tbody tr>td{display:block;width:100%;min-width:0;max-width:none;padding:10px}
+ #cgProdutividade .cg-monthly-pivot tbody tr>td::before{content:attr(data-cg-label);display:block;margin-bottom:6px;text-align:left;font-weight:650}
+ #cgProdutividade .cg-monthly-pivot .cg-monthly-month-name,#cgProdutividade .cg-monthly-pivot tbody th>small{display:inline;margin-left:5px}
+}

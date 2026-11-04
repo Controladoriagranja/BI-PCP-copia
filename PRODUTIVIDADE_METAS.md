@@ -23,8 +23,8 @@ em uma única linha A.N.; selecionar 1º ou 2º turno restringe a fonte e a meta
 `data_referencia` é a data civil. O limite permanece o `data_limite` D−1 retornado
 pelo relatório, inclusive em semana cheia e no acumulado mensal.
 
-**Acumulado mensal:** por solicitação posterior do usuário, sempre exibe Ave Nova
-e Real Alimentos, independentemente da Unidade/turno escolhidos para o calendário.
+**Acumulado mensal:** a seleção única **Unidade / Turno** agora filtra o calendário,
+o mensal e o total anual. As opções Real + Ave Nova mantêm as empresas separadas.
 O total da A.N. usa `pcp.diario_industria`, selecionando o maior registro de
 Cabeças por empresa/dia na seção escolhida pela mesma prioridade Abate/Recepção,
 somando esses valores no mês. Não há soma entre seções nem complemento de datas
@@ -38,14 +38,17 @@ Cada ano selecionado tem sua própria linha de total. Aves e Peso (kg) somam os
 valores disponíveis até D−1; as metas seguem os dias realizados de cada empresa.
 Uma referência incompleta deixa a meta e a diferença consolidadas sem valor ou
 cor parcial. Peso continua sem meta. Os totais usam vinho claro do tema e a
-tabela permite rolagem horizontal dentro do painel, com o mês fixo à esquerda.
+tabela ocupa a largura do card abaixo do calendário, sem rolagem horizontal.
+Em telas estreitas, reorganiza os blocos mantendo os valores e os rótulos.
 
 A rotina de leitura seleciona o maior registro de Cabeças por empresa/dia
-na seção escolhida também no diário comum. O mensal não usa a seleção
-de turno do calendário para seus valores ou metas e não repete consultas quando
-apenas essa seleção muda. Ano e Grupo continuam aplicáveis como anteriormente.
+na seção escolhida também no diário comum. Ao selecionar um turno, o mensal
+consulta registros identificados daquele turno e usa as metas compatíveis.
+Ano e Grupo continuam aplicáveis; Mês, Dia e Semana cheia continuam sem restringir
+o acumulado mensal. Uma mudança de Unidade / Turno invalida a consulta mensal.
 
-**Filtro Unidade do calendário:** seleção única, reutilizando o menu existente.
+**Filtro Unidade / Turno:** seleção única, reutilizando o menu existente, com nove
+opções (Ave Nova, Real Alimentos ou ambas × Todos, 1º ou 2º turno).
 Ave Nova é a seleção inicial e volta ao clicar em Limpar filtros; não há opção de
 selecionar todas ou deixar vazio em Produtividade. Trocar para Rendimento restaura
 sua seleção múltipla anterior. O título mostra o mês e a unidade/turno, por exemplo
@@ -68,6 +71,11 @@ empresa importada com a opção de 1º turno.
 
 Real Alimentos também aplica a prioridade Abate/Recepção, com MAX por empresa/dia,
 com `diario_industria` e o complemento `dados_gerais` quando confirmado pelo catálogo.
+Ao filtrar um turno da Real, só utiliza registros com `turno_codigo` correspondente
+nas fontes compatíveis do catálogo, incluindo `diario_industria_turnos`.
+Consolidados sem turno não são reaproveitados. Sem registros por turno, mostra a
+limitação. As metas disponíveis da Real são consolidadas; não são divididas
+artificialmente entre turnos, e Meta/Diferença permanecem sem referência nesse caso.
 Essa preservação foi expressamente confirmada pelo usuário.
 
 ### Reconciliação com dados reais enviados pelo usuário
@@ -97,8 +105,9 @@ somados ou usados como substitutos. O peso utiliza maior valor por empresa/data/
 turno, sem restringir seção, preservando o histórico de Recepção e evitando contar
 novamente Abate/Compra/Recepção. No calendário A.N. total, soma os maiores valores
 dos dois turnos; selecionar 1T/2T mantém apenas o respectivo turno. R.A. segue seu
-diário comum. O mensal usa os maiores valores diários do diário comum e exibe
-sempre as duas empresas, conforme a regra vigente desse bloco.
+diário comum na seleção Todos os turnos. O mensal usa o diário comum para os
+consolidados e os registros identificados por turno para seleções específicas,
+exibindo apenas as empresas da seleção Unidade / Turno.
 
 | Data | A.N. 1T (kg) | A.N. 2T (kg) | A.N. total/diário (kg) | R.A. diário (kg) |
 |---|---:|---:|---:|---:|

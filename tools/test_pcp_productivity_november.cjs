@@ -56,6 +56,7 @@ module.exports=(async()=>{
  }
  // O mensal mantém o diário comum e as duas empresas, sem o filtro de turno.
  const monthlyState={status:'ready',limit:fixture.limit,metas,rows:await app.productivityHeads.load(get,periods,'',signal,false,fixture.limit,'diario'),pesos:await app.productivityWeight.load(get,periods,'',signal,false,fixture.limit,'diario')};
+ fields.Unidade.value='both';
  const box={innerHTML:'',scrollTop:0,scrollLeft:0,querySelector:()=>({style:{}})},status={};
  const monthly=app.createProductivityMonthly({querySelector:s=>s==='p'?status:box,closest:()=>null},fields,()=>monthlyState,()=> '2026-11');monthly.render();
  const monthlyRow=box.innerHTML.match(/<tr data-cg-month-period="2026-11"[^>]*>(.*?)<\/tr>/)[1],cells=[...monthlyRow.matchAll(/<td[^>]*>(.*?)<\/td>/g)].map(m=>m[1]);

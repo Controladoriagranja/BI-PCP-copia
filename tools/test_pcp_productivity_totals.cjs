@@ -40,5 +40,5 @@ assert.equal(box.scrollTop,120);assert.equal(box.scrollLeft,180);
 fields.Ano.value='';monthly.render();assert.equal((box.innerHTML.match(/data-cg-total-year=/g)||[]).length,2);
 const css=fs.readFileSync(path.join(root,'assets/css/pcp.css'),'utf8');
 assert.match(css,/#cgProdutividade \.cg-monthly-scroll\{[^}]*overflow:auto/);
-assert.match(css,/#cgProdutividade \.cg-monthly-pivot\{[^}]*min-width:650px/);
+assert.match(css,/#cgProdutividade \.cg-monthly-pivot\{[^}]*min-width:0/);
 console.log('OK: totais mensais e anuais por empresa e consolidados, peso sem meta, D−1, ausência, metas incompletas e rolagem horizontal.');
