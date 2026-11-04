@@ -19,7 +19,9 @@ aba Produtividade. Nada foi publicado, e não houve mudança em SQL, endpoints o
   No mensal, as colunas das empresas e Total do mês/final anual continuam
   disponíveis; a coluna Total soma os indicadores das duas empresas.
 - As linhas dos meses alternam branco/bege em todas as células comuns, inclusive
-  Mês; Total do mês conserva seu vinho claro, assim como o total anual.
+  Mês e Total do mês. Somente a linha Total do ano mantém o vinho claro.
+- Calendário e acumulado têm margem lateral de 6 px por lado para deixar uma
+  pequena folga de rolagem junto aos cards.
 - Grupo e Ano continuam aplicáveis ao mensal. Mês, Dia e Semana cheia mantêm seu
   comportamento anterior: ajustam o calendário, sem restringir os meses do acumulado.
 - Limpar filtros restaura Ave Nova e desmarca Semana cheia.
@@ -58,8 +60,8 @@ Foram aprovadas as cinco opções em viewports de **1366, 1440, 1920, 1024, 600 
 - Mensal abaixo do calendário; meses e anual coerentes com cada seleção.
 - Consolidação por dia, detalhamento e totais em Real Alimentos + Ave Nova,
   incluindo saldo negativo resultante de uma diferença positiva e outra negativa.
-- Fundo de mês uniforme entre Mês e empresas, alternância branco/bege e
-  preenchimento de Total do mês preservado.
+- Fundo de mês uniforme entre Mês, empresas e Total do mês, alternância branco/bege,
+  Total do ano em vinho claro e folga lateral discreta nos dois cards.
 - Grupo, Dia, Semana cheia, setas sincronizadas com Mês e Limpar filtros.
 - Opções, seleção múltipla, marcação da tabela e estilo dos filtros de Rendimento
   preservados após alternar as abas.

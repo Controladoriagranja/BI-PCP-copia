@@ -59,6 +59,7 @@ TEST = r'''
    for(const cell of root.querySelectorAll('.cg-production-grid td,.cg-monthly-pivot td'))
     if(cell.getBoundingClientRect().width>0)assert(cell.scrollWidth<=cell.clientWidth+1,'Número ultrapassa célula '+value+' '+cell.textContent.trim());
    const bounds=root.getBoundingClientRect();
+   for(const card of [calendar,monthly]){const rect=card.getBoundingClientRect();assert(rect.left>=bounds.left+5&&rect.right<=bounds.right-5,'Folga lateral discreta nos dois cards');}
    for(const number of root.querySelectorAll('strong')){
     const rect=number.getBoundingClientRect();if(rect.width===0)continue;
     assert(rect.left>=bounds.left-1&&rect.right<=bounds.right+1,'Número fora do card: '+number.textContent);
@@ -83,11 +84,11 @@ TEST = r'''
    assert(JSON.stringify(values(annualRow))===JSON.stringify(monthlyExpected),'Anual '+value);
    if(value==='both'){
     const stripes=[...document.querySelectorAll('.cg-monthly-pivot tr[data-cg-month-period]')].slice(0,3);
-    const backgrounds=stripes.map(row=>[...row.children].filter(cell=>!cell.classList.contains('cg-monthly-total')).map(cell=>getComputedStyle(cell).backgroundColor));
+    const backgrounds=stripes.map(row=>[...row.children].map(cell=>getComputedStyle(cell).backgroundColor));
     assert(backgrounds.every(row=>row.every(color=>color===row[0])),'Cada mês deve ter fundo uniforme, incluindo a coluna Mês');
     assert(backgrounds[0][0]!==backgrounds[1][0]&&backgrounds[0][0]===backgrounds[2][0],'Alternância branco/bege entre meses');
-    const totalColors=stripes.map(row=>getComputedStyle(row.querySelector('.cg-monthly-total')).backgroundColor);
-    assert(totalColors.every(color=>color===totalColors[0])&&totalColors[0]!==backgrounds[0][0],'Preservar preenchimento da coluna Total do mês');
+    const annualColors=[...annualRow.children].map(cell=>getComputedStyle(cell).backgroundColor);
+    assert(annualColors.every(color=>color===annualColors[0])&&annualColors[0]!==backgrounds[0][0]&&annualColors[0]!==backgrounds[1][0],'Total anual mantém o destaque vinho claro');
     const day3=document.querySelector('[data-cg-day="2026-11-03"]');
     assert(day3.querySelectorAll('.cg-production-heads>span').length===1,'Exibir um total consolidado por dia');
     assert(parse(day3.querySelector('.cg-production-heads>span>strong'))===189477,'Somar aves por dia');
