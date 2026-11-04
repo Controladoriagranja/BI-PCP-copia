@@ -47,9 +47,8 @@ module.exports=(async()=>{
  const get=async(endpoint,params)=>{
   if(endpoint==='/api/pcp/tabelas')return catalog;
   const table=endpoint.split('/').pop();
-  if(table==='diario_industria_turnos')assert.equal(params.secao,'Abate - Total');
-  else assert.equal(params.secao,undefined,'Não introduz filtro de seção na Real Alimentos');
-  const real={data_referencia:'2026-10-09',empresa:'Real Alimentos',empresa_codigo:'111',descricao:'Cabeças',quantidade:table==='dados_gerais'?80500:80560};
+  assert.equal(params.secao,undefined,'Cabeças usa MAX por empresa/dia/turno sem excluir Recepção');
+  const real={data_referencia:'2026-10-09',empresa:'Real Alimentos',empresa_codigo:'111',secao:'Recepção de Aves Vivas',descricao:'Cabeças',quantidade:table==='dados_gerais'?80500:80560};
   // Deliberadamente devolve todas as seções e turnos: o cliente também valida os registros.
   const dados=table==='diario_industria_turnos'?records:[real];
   return {ok:true,tabela:table,pagina:1,tamanho:1000,total:dados.length,dados};
@@ -77,7 +76,7 @@ module.exports=(async()=>{
    ];
    const size=2;return {ok:true,tabela:table,pagina:params.pagina,tamanho:size,total:dados.length,dados:dados.slice((params.pagina-1)*size,params.pagina*size)};
   }
-  const real={data_referencia:'2026-10-09',empresa:'Real Alimentos',empresa_codigo:'111',descricao:'Cabeças',quantidade:table==='dados_gerais'?80500:80560};
+  const real={data_referencia:'2026-10-09',empresa:'Real Alimentos',empresa_codigo:'111',secao:'Recepção de Aves Vivas',descricao:'Cabeças',quantidade:table==='dados_gerais'?80500:80560};
   const dados=table==='dados_gerais'?[real]:[
    raw('2026-01-02','0','Abate - Total',100),raw('2026-01-02','0','Recepção de Aves Vivas',100),
    raw('2026-01-03','0','Abate - Total',200),raw('2026-02-02','0','Abate - Total',300),

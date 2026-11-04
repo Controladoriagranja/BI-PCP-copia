@@ -59,7 +59,7 @@ module.exports = (async () => {
   const all = api();
   const result = plain(await heads.load(all.get, periods, '', signal));
   assert.deepEqual(result, [
-    { data: '2026-10-09', empresa_codigo: '10', empresa: 'Ave Nova', quantidade_cabecas: 267830, turnos: {1:267830} },
+    { data: '2026-10-09', empresa_codigo: '10', empresa: 'Ave Nova', quantidade_cabecas: 108915, turnos: {1:108915} },
     { data: '2026-10-09', empresa_codigo: '111', empresa: 'Real Alimentos', quantidade_cabecas: 80560 },
     { data: '2026-10-10', empresa_codigo: '10', empresa: 'Ave Nova', quantidade_cabecas: 0, turnos: {1:0} }
   ]);
@@ -75,7 +75,7 @@ module.exports = (async () => {
   const bothShifts = api([row(69414, '10', { turno_codigo: '1' }), row(39501, '10', { turno_codigo: '2' })]);
   assert.equal((await heads.load(bothShifts.get, periods, '1,2', signal))[0].quantidade_cabecas, 108915);
   const lastPage = api([row(1), row(2), row(108915)]);
-  assert.equal((await heads.load(lastPage.get, periods, '10', signal))[0].quantidade_cabecas, 108918);
+  assert.equal((await heads.load(lastPage.get, periods, '10', signal))[0].quantidade_cabecas, 108915);
   const empty = api([]); assert.deepEqual(plain(await heads.load(empty.get, periods, '', signal)), []);
 
   // Empresa original é respeitada mesmo quando os metadados possuem outros códigos.
@@ -226,7 +226,7 @@ module.exports = (async () => {
   state.data = null; await state.refreshHeads();
   assert.equal(pending.length, 7, 'Não consulta produtividade antes de obter o limite do relatório');
   assert.equal(state.headsState.rows.length, 0);
-  console.log('OK: SUM por turno/dia na A.N., MAX preservado na R.A., Descrição exata, paginação completa, empresas e turnos separados, catálogo, datas civis, nulos e erros.');
+  console.log('OK: MAX por empresa/dia/turno na A.N., soma dos turnos, MAX preservado na R.A., Descrição exata, paginação completa, catálogo, datas civis, nulos e erros.');
   console.log('OK: consultas de Semana cheia incluem dias adjacentes, anos diferentes e não duplicam registros em períodos sobrepostos.');
   console.log('OK: D−1 limita consultas, registros, semanas completas e meses futuros conforme o cabeçalho.');
 })();

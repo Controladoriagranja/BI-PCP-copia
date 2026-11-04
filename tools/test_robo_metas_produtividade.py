@@ -190,23 +190,36 @@ class MetasTests(unittest.TestCase):
 
     def test_reconciliation_sums_both_turns_and_preserves_absence(self):
         def row(value, turn=None, day='2026-10-09', name='Ave Nova'):
-            return {'data':day,'empresa':'Ave Nova' if name == 'Ave Nova' else name,'empresa_codigo':'10','quantidade':value,'turno':turn}
-        result = comparar([row(69414),row(108915)], [row(40000,1),row(29414,1),row(39501,2),row(999999,3),row(80560,1,name='Real Alimentos'),row(0,1,'2026-10-10')])
+            return {'data':day,'empresa':'Ave Nova' if name == 'Ave Nova' else name,'empresa_codigo':'10','quantidade':value,'turno':turn,'secao':'Abate - Total'}
+        result = comparar([row(69414),row(108915)], [row(69414,1),row(40000,1),row(29414,1),row(39501,2),row(999999,3),row(80560,1,name='Real Alimentos'),row(0,1,'2026-10-10')])
         self.assertEqual(result[0]['an_novo_total'], 108915)
         self.assertEqual(result[0]['diferenca'], 0)
         self.assertEqual(result[1]['an_novo_total'], 0)
         self.assertIsNone(result[1]['diferenca'])
 
-    def test_reconciliation_query_filters_abate_only_for_turns(self):
+    def test_reconciliation_query_preserves_sections_for_turn_maximum(self):
         conn = MagicMock()
         cursor = conn.cursor.return_value.__enter__.return_value
         columns = [(c,) for c in ('data_referencia','empresa_codigo','empresa','descricao','quantidade','turno_codigo','secao')]
-        cursor.fetchall.side_effect = [columns, [(date(2026,10,1),'1','Ave Nova',63393,'1')]]
+        cursor.fetchall.side_effect = [columns, [(date(2026,10,1),'1','Ave Nova',63393,'1','Abate - Total')]]
         result = consultar(conn,'diario_industria_turnos',date(2026,10,1),date(2026,10,28))
         query, params = cursor.execute.call_args.args
-        self.assertIn('secao=%s',query)
-        self.assertEqual(params,('Cabeças',date(2026,10,1),date(2026,10,28),'Abate - Total'))
+        self.assertNotIn('secao=%s',query)
+        self.assertEqual(params,('Cabeças',date(2026,10,1),date(2026,10,28)))
         self.assertEqual(result[0]['quantidade'],63393)
+
+    def test_reconciliation_section_priority_and_receipt_fallback(self):
+        def row(value, section, turn='1'):
+            return {'data':'2026-11-02','empresa':'Ave Nova','empresa_codigo':'1','quantidade':value,'turno':turn,'secao':section}
+        rows = [row(999,'Compra de Aves Vivas'),row(200,'Recepção de Aves Vivas'),
+                row(0,'Abate - Total'),row(40,'Recepção de Aves Vivas','2')]
+        for records in (rows, list(reversed(rows))):
+            result = comparar(records, records)
+            self.assertEqual(result[0]['an_diario_anterior'],0)
+            self.assertEqual(result[0]['an_1t'],0)
+            self.assertEqual(result[0]['an_2t'],40)
+            self.assertEqual(result[0]['an_novo_total'],40)
+        self.assertEqual(comparar([], [row(999,'Compra de Aves Vivas')]), [])
 
 
 if __name__ == '__main__':

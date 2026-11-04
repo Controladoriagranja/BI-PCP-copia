@@ -1,4 +1,4 @@
-"""Compara MAX diário antigo com SUM(1T)+SUM(2T) de Abate - Total da A.N.; somente SELECT."""
+"""Reconcilia Cabeças da A.N.: Abate primeiro, Recepção depois; somente SELECT."""
 from __future__ import annotations
 
 import argparse
@@ -36,25 +36,39 @@ def consultar(conn, tabela, inicio, fim):
         # Os identificadores interpolados pertencem exclusivamente à lista fixa acima.
         nome = 'empresa' if 'empresa' in colunas else 'NULL AS empresa'
         turno = 'turno_codigo' if 'turno_codigo' in colunas else 'NULL AS turno_codigo'
-        filtro_secao = ' AND secao=%s' if tabela.endswith('_turnos') else ''
-        params = ('Cabeças', inicio, fim) + (('Abate - Total',) if filtro_secao else ())
-        cur.execute(f'SELECT data_referencia,empresa_codigo,{nome},quantidade,{turno} FROM pcp.{tabela} '
-                    'WHERE descricao=%s AND data_referencia>=%s AND data_referencia<=%s' + filtro_secao, params)
-        return [dict(zip(('data', 'empresa_codigo', 'empresa', 'quantidade', 'turno'), r)) for r in cur.fetchall()]
+        secao = 'secao' if 'secao' in colunas else 'NULL AS secao'
+        params = ('Cabeças', inicio, fim)
+        cur.execute(f'SELECT data_referencia,empresa_codigo,{nome},quantidade,{turno},{secao} FROM pcp.{tabela} '
+                    'WHERE descricao=%s AND data_referencia>=%s AND data_referencia<=%s', params)
+        return [dict(zip(('data', 'empresa_codigo', 'empresa', 'quantidade', 'turno', 'secao'), r)) for r in cur.fetchall()]
 
 
 def comparar(antigo, novo):
     antigos, turnos = {}, {}
+    prioridades_antigas, prioridades_turnos = {}, {}
+    def prioridade(row):
+        return {'Abate - Total': 0, 'Recepção de Aves Vivas': 1}.get(row.get('secao'))
     for row in antigo:
-        if empresa(row) != '10' or row['quantidade'] is None:
+        rank = prioridade(row)
+        if empresa(row) != '10' or row['quantidade'] is None or rank is None:
             continue
         dia, valor = str(row['data'])[:10], Decimal(str(row['quantidade']))
-        antigos[dia] = max(antigos[dia], valor) if dia in antigos else valor
+        anterior = prioridades_antigas.get(dia, 2)
+        if rank > anterior:
+            continue
+        antigos[dia] = max(antigos[dia], valor) if rank == anterior else valor
+        prioridades_antigas[dia] = rank
     for row in novo:
-        if empresa(row) != '10' or str(row['turno']) not in {'1', '2'} or row['quantidade'] is None:
+        rank = prioridade(row)
+        if empresa(row) != '10' or str(row['turno']) not in {'1', '2'} or row['quantidade'] is None or rank is None:
             continue
         dia, turno, valor = str(row['data'])[:10], str(row['turno']), Decimal(str(row['quantidade']))
-        turnos.setdefault(dia, {})[turno] = turnos.get(dia, {}).get(turno, Decimal(0)) + valor
+        anterior = prioridades_turnos.get((dia, turno), 2)
+        if rank > anterior:
+            continue
+        anteriores = turnos.setdefault(dia, {})
+        anteriores[turno] = max(anteriores[turno], valor) if rank == anterior else valor
+        prioridades_turnos[dia, turno] = rank
     resultado = []
     for dia in sorted(set(antigos) | set(turnos)):
         valores = turnos.get(dia, {})

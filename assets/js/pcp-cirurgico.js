@@ -38,7 +38,8 @@ window.PcpCirurgico=(()=>{
    const description=original('descricao'),quantity=original('quantidade');
    if(!columns.includes('data_referencia')||!columns.includes('empresa_codigo'))throw Error('Data ou empresa não confirmada no catálogo PCP.');
    if(table==='diario_industria_turnos'&&!columns.includes('turno_codigo'))throw Error('Turno não confirmado no catálogo PCP.');
-   const section=table==='diario_industria_turnos'?original('secao'):null;
+   const hasSection=columns.includes('secao')||(entry.mapeamento||[]).some(m=>String(m.nome_original).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()==='secao');
+   const section=table==='diario_industria_turnos'||hasSection?original('secao'):null;
    return {description,quantity,section,date:'data_referencia',company:'empresa_codigo',name:columns.includes('empresa')?'empresa':null};
   }
   function civilDate(value){
@@ -52,11 +53,9 @@ window.PcpCirurgico=(()=>{
    if(typeof value!=='string'||!/^[-+]?\d+(?:\.\d+)?$/.test(value.trim()))return null;
    const number=Number(value);return Number.isFinite(number)?number:null;
   }
-  function collect(target,rows,columns,params){
+  function collect(target,priorities,rows,columns,params){
    for(const row of rows){
     if(row[columns.description]!==params.metricDescription)continue;
-    // Abate já engloba Recepção + Compra; somar essas seções repetiria as mesmas aves.
-    if(params.somarTurno&&!params.weight&&row[columns.section]!=='Abate - Total')continue;
     // Empresa é o nome original do relatório; empresa_codigo é metadado da importação.
     const company=headCompany(columns.name&&row[columns.name])||headCompany(row[columns.company]);
     const date=civilDate(row[columns.date]),value=quantity(row[columns.quantity]);
@@ -64,15 +63,23 @@ window.PcpCirurgico=(()=>{
     if(params.empresas&&!params.empresas.includes(company))continue;
     if(params.turno&&String(row.turno_codigo)!==params.turno)continue;
     const key=company+'|'+date,previous=target.get(key),name=headCompanies[company],field=params.weight?'peso_vivo':'quantidade_cabecas';
+    const section=columns.section?row[columns.section]:null;
+    const priority=params.weight?0:section==='Abate - Total'?0:section==='Recepção de Aves Vivas'?1:2;
+    if(!params.weight&&priority===2)continue;
+    const selectionKey=key+(params.somarTurno?'|'+params.turno:''),previousPriority=priorities.get(selectionKey)??Infinity;
+    if(priority>previousPriority)continue;
     if(params.somarTurno){
      const turnos={...(previous?.turnos||{})};
-     turnos[params.turno]=params.weight?Math.max(turnos[params.turno]??-Infinity,value):(turnos[params.turno]??0)+value;
-     const total=params.weight?Object.values(turnos).reduce((sum,number)=>sum+number,0):(previous?.[field]??0)+value;
+     // Cabeças: Abate primeiro, depois Recepção; MAX dentro da seção escolhida.
+     // Peso mantém MAX sem prioridade. Nunca somar seções do mesmo turno.
+     turnos[params.turno]=priority<previousPriority?value:Math.max(turnos[params.turno]??-Infinity,value);
+     const total=Object.values(turnos).reduce((sum,number)=>sum+number,0);
      target.set(key,{data:date,empresa_codigo:company,empresa:name,[field]:total,turnos});
-    }else if(!previous||value>previous[field]||(value===previous[field]&&name<previous.empresa)){
-     // O diário comum mantém o maior registro por empresa/dia, sem somar seções.
+    }else if(!previous||priority<previousPriority||value>previous[field]||(value===previous[field]&&name<previous.empresa)){
+     // A prioridade também vale no diário comum, sem somar seções.
      target.set(key,{data:date,empresa_codigo:company,empresa:name,[field]:value});
     }
+    priorities.set(selectionKey,priority);
    }
   }
   function scopes(units,catalog,totalSource){
@@ -112,12 +119,12 @@ window.PcpCirurgico=(()=>{
    if(!ranges.length)return [];
    const catalog=await get(APP_CONFIG.endpoints.modelo,{}, {silent:true,signal});
    if(!catalog.ok||!Array.isArray(catalog.tabelas))throw Error('Catálogo PCP indisponível.');
-   const target=new Map();
+   const target=new Map(),priorities=new Map();
    for(const scope of scopes(units,catalog,totalSource)){
     const columns=schema(catalog,scope.table),{table,empresas,turno,somarTurno}=scope;
     for(const {inicio,fim} of ranges){
      const weight=metricDescription==='Peso Vivo para Rendimento';
-     const params={...(turno?{turno}:{}),...(somarTurno&&!weight?{[columns.section]:'Abate - Total'}:{}),inicio,fim,[columns.description]:metricDescription};
+     const params={...(turno?{turno}:{}),inicio,fim,[columns.description]:metricDescription};
      let page=1,expectedTotal=null,received=0;
      do{
       if(signal.aborted)throw new DOMException('Consulta cancelada','AbortError');
@@ -127,7 +134,7 @@ window.PcpCirurgico=(()=>{
       if(result.total!==expectedTotal||result.dados.length>result.tamanho)throw Error('A fonte de Cabeças mudou durante a consulta. Atualize novamente.');
       received+=result.dados.length;
       if(received>expectedTotal||(received<expectedTotal&&result.dados.length!==result.tamanho))throw Error('Paginação de Cabeças incompleta.');
-      collect(target,result.dados,columns,{...params,empresas,somarTurno,weight,metricDescription});
+      collect(target,priorities,result.dados,columns,{...params,empresas,somarTurno,weight,metricDescription});
       if(received===expectedTotal)break;
       page++;
      }while(true);

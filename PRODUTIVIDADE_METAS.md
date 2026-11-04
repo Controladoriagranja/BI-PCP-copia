@@ -2,7 +2,7 @@
 
 Implementação limitada ao projeto **BI-PCP copia**, na opção **Produtividade** do
 Comparativo x Cirúrgico Geral. As fórmulas e as consultas de Rendimento não foram
-alteradas. Data da conferência: **29/10/2026**, fuso America/Sao_Paulo.
+alteradas. Última conferência: **04/11/2026**, fuso America/Sao_Paulo.
 
 ## Regra da fonte, confirmada com os resultados SQL enviados
 
@@ -10,11 +10,15 @@ No calendário, Ave Nova usa `pcp.diario_industria_turnos`, com:
 
 ```sql
 WHERE descricao = 'Cabeças'
-  AND secao = 'Abate - Total'
   AND turno_codigo IN ('1', '2')
 ```
 
-Soma `quantidade` por empresa/data/turno. Ave Nova mostra a soma dos dois turnos
+Procura `Cabeças` primeiro em **Abate - Total** e, sem valor numérico nessa seção,
+em **Recepção de Aves Vivas**. Seleciona o maior `quantidade` dentro da seção
+escolhida, por empresa/data/turno. Zero é valor válido e não aciona a segunda opção.
+Sem valor nas duas seções, mantém o tratamento existente de dia sem produção,
+sem buscar Compra ou outras seções. Essa ordem foi confirmada pelo usuário.
+Ave Nova mostra a soma dos dois turnos
 em uma única linha A.N.; selecionar 1º ou 2º turno restringe a fonte e a meta.
 `data_referencia` é a data civil. O limite permanece o `data_limite` D−1 retornado
 pelo relatório, inclusive em semana cheia e no acumulado mensal.
@@ -22,9 +26,10 @@ pelo relatório, inclusive em semana cheia e no acumulado mensal.
 **Acumulado mensal:** por solicitação posterior do usuário, sempre exibe Ave Nova
 e Real Alimentos, independentemente da Unidade/turno escolhidos para o calendário.
 O total da A.N. usa `pcp.diario_industria`, selecionando o maior registro de
-Cabeças por empresa/dia e somando esses valores no mês, como antes, sem restringir
-seção. Não há soma entre seções, prioridade de Abate ou complemento de datas por
-outra fonte no mensal geral. O calendário mantém sua seleção de Abate por turnos.
+Cabeças por empresa/dia na seção escolhida pela mesma prioridade Abate/Recepção,
+somando esses valores no mês. Não há soma entre seções nem complemento de datas
+da Ave Nova por outra fonte no mensal geral. O calendário soma os máximos
+selecionados de cada turno.
 Metas, diferenças, D−1 e a regra da R.A. são preservados.
 
 O mensal inclui a coluna **Total do mês**, somando Ave Nova e Real Alimentos,
@@ -35,8 +40,8 @@ Uma referência incompleta deixa a meta e a diferença consolidadas sem valor ou
 cor parcial. Peso continua sem meta. Os totais usam vinho claro do tema e a
 tabela permite rolagem horizontal dentro do painel, com o mês fixo à esquerda.
 
-A rotina de leitura preserva a seleção do maior registro de Cabeças por
-empresa/dia, sem restringir seção no diário comum. O mensal não usa a seleção
+A rotina de leitura seleciona o maior registro de Cabeças por empresa/dia
+na seção escolhida também no diário comum. O mensal não usa a seleção
 de turno do calendário para seus valores ou metas e não repete consultas quando
 apenas essa seleção muda. Ano e Grupo continuam aplicáveis como anteriormente.
 
@@ -48,7 +53,11 @@ sua seleção múltipla anterior. O título mostra o mês e a unidade/turno, por
 
 O diagnóstico mostrou que **Recepção + Compra já estão incluídas em Abate - Total**.
 Somar todas essas seções produzia exatamente o dobro nos 23 dias de outubro
-consultados pelo usuário. A seleção de Abate evita essa contagem repetida.
+consultados pelo usuário. Em novembro, os registros enviados em 04/11 existem
+somente em Recepção; por isso, o filtro exclusivo de Abate foi removido.
+O MAX dentro da seção escolhida por empresa/data/turno evita a contagem repetida
+e a segunda opção Recepção aceita esses meses. Não se compara a Quantidade de
+Abate contra Recepção para escolher a seção: Abate tem prioridade mesmo se menor.
 Os nomes de Descrição, Quantidade e Seção são conferidos pelo catálogo antes da
 consulta; divergências não produzem valores substitutos.
 
@@ -57,7 +66,7 @@ prevalece sobre o metadado de importação. Nos dados enviados, Ave Nova tem
 `empresa_codigo='1'` e `unidade_codigo='10'`; o filtro não confunde o código da
 empresa importada com a opção de 1º turno.
 
-Real Alimentos permanece com a regra anterior: maior quantidade por empresa/dia,
+Real Alimentos também aplica a prioridade Abate/Recepção, com MAX por empresa/dia,
 com `diario_industria` e o complemento `dados_gerais` quando confirmado pelo catálogo.
 Essa preservação foi expressamente confirmada pelo usuário.
 
@@ -71,7 +80,7 @@ Essa preservação foi expressamente confirmada pelo usuário.
 
 Os valores provêm dos resultados SQL colados na conversa, não de uma conexão local.
 O segundo turno ausente no sábado permanece ausente. A conferência completa de
-outubro, com o filtro de Abate, está na consulta 5 de
+outubro, com a prioridade de seção e MAX por turno, está na consulta 5 de
 `tools/conferir_produtividade.sql`; os demais dias corrigidos ainda precisam desse retorno.
 
 ## Metas e cores
@@ -278,7 +287,7 @@ node tools/test_produtividade_metas.cjs
 ```
 
 - Teste JavaScript com a amostra real enviada: Todos, Ave Nova, 1T, 2T e Real;
-  Abate não soma novamente Recepção/Compra, mesmo se a API devolver todas as seções.
+  MAX por turno não soma novamente Recepção/Compra, mesmo se a API devolver todas as seções.
 - Testes de referências: igualdade/acima/abaixo, sábado 2T vazio, domingo, zero
   realizado, sem registro, empresas separadas, vigência mensal, semana cheia,
   mês sem meta, resposta duplicada/inválida e limite D−1.
@@ -293,7 +302,8 @@ Os testes de cálculo/importação são locais. A carga manual real foi executad
 usuário e seus totais foram retornados na conversa. O agente não abriu conexão de
 escrita no banco. Não houve importação da planilha final da rede, cujo acesso não estava disponível à sessão.
 Não houve teste visual em navegador autenticado nem publicação. A reconciliação
-de três dias reais é a tabela acima; os demais cenários usam fixtures de teste.
+de outubro é a tabela acima. A amostra de novembro e os limites da auditoria
+estão em `AUDITORIA_PRODUTIVIDADE_NOVEMBRO.md`.
 
 ## SQL e arquivos
 
@@ -307,7 +317,7 @@ reutiliza a rota existente de SELECT da API.
 
 Arquivos de interface alterados:
 
-- `assets/js/pcp-cirurgico.js`: fonte Abate/turnos da A.N., metas e classificação,
+- `assets/js/pcp-cirurgico.js`: MAX de Cabeças por dia/turno da A.N., metas e classificação,
   legendas; nomes completos dos turnos apenas em Produtividade.
 - `assets/css/pcp.css`: cores legíveis e legendas limitadas a `#cgProdutividade`.
 - `index.html`: versões de cache desses dois arquivos.
