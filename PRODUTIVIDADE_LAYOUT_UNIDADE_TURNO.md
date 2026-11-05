@@ -118,3 +118,30 @@ e ajustes nos testes de mensal, totais e amostra de novembro para a nova seleç�
 arquivos anteriores à edição. `manifesto.json` registra o SHA-256 de cada arquivo,
 conferido contra o ZIP. Backup local ignorado pelo Git, sem publicar ou alterar
 permissões. Não inclui `.git`, caches, saídas de testes ou arquivo `.env`.
+
+## Desempenho do primeiro carregamento — 05/11/2026
+
+A carga anual fazia chamadas mensais sequenciais dentro de cada fonte/turno.
+Cabeças e Peso também repetiam o catálogo. A leitura agora reúne intervalos
+contínuos em um único intervalo, limitado a D−1, sem incluir lacunas entre meses
+não selecionados. Mantém os filtros, a paginação e as regras numéricas anteriores.
+O catálogo é compartilhado somente entre chamadas com a mesma função de transporte
+e o mesmo AbortSignal; uma nova carga usa um catálogo novo. Falhas podem ser
+repetidas sem reaproveitar uma promessa rejeitada. Não há cache persistente de
+dados ou sessão. API, SQL, banco e Rendimento não foram alterados.
+
+O teste `tools/test_pcp_productivity_performance.cjs` compara os resultados
+completos contra a versão anterior. Usa a amostra de novembro replicada em janeiro
+a novembro para simular a carga anual até 03/11/2026: 71 chamadas antes e 8 depois
+(88,73% menos), com páginas de 1.000 registros. Com páginas de apenas 3 registros,
+as páginas adicionais continuam sendo lidas e os resultados permanecem idênticos.
+Isso mede chamadas em transporte simulado, não o tempo da API publicada.
+O relatório fica em `outputs/produtividade-desempenho/comparacao.json`.
+
+Foram aprovadas dez suítes JavaScript e o teste de interface com sete combinações
+nas larguras de 1366, 1440 e 1920 px após a otimização. Os 12 meses, turnos,
+consolidados, metas e diferenças mantêm o conteúdo anterior.
+
+Backup imediatamente anterior à otimização: `outputs/backups/produtividade-antes-desempenho-20261105-135313`,
+com JavaScript, index e manifesto SHA-256. O ZIP anterior aos ajustes de layout
+também permanece disponível no caminho registrado acima. Nada foi publicado.

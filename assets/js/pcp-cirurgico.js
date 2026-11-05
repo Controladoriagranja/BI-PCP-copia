@@ -48,6 +48,19 @@ window.PcpCirurgico=(()=>{
  }
  // Fonte bruta já publicada. Nenhum indicador ou peso de Rendimento participa desta seleção.
  const productivityHeads=(()=>{
+  // Cada carga compartilha só o catálogo; dados e respostas não persistem entre cargas.
+  const catalogs=new WeakMap();
+  function catalogFor(get,signal){
+   let requests=catalogs.get(get);
+   if(!requests){requests=new WeakMap();catalogs.set(get,requests);}
+   let pending=requests.get(signal);
+   if(!pending){
+    pending=Promise.resolve().then(()=>get(APP_CONFIG.endpoints.modelo,{}, {silent:true,signal}));
+    requests.set(signal,pending);
+    pending.catch(()=>{if(requests.get(signal)===pending)requests.delete(signal);});
+   }
+   return pending;
+  }
   function schema(catalog,table){
    const entry=catalog.tabelas?.find(t=>t.tabela===table);
    if(!entry)throw Error('Fonte de Cabeças não disponível no catálogo PCP.');
@@ -143,10 +156,11 @@ window.PcpCirurgico=(()=>{
    const ranges=[];
    for(const range of periods.map(({year,month})=>productionMonth(year,month,fullWeek)).filter(range=>range.inicio<=limit).map(range=>({...range,fim:range.fim<limit?range.fim:limit})).sort((a,b)=>a.inicio.localeCompare(b.inicio))){
     const last=ranges[ranges.length-1];
-    if(last&&range.inicio<=last.fim)last.fim=last.fim>range.fim?last.fim:range.fim;else ranges.push({...range});
+    const adjacent=last&&Date.parse(range.inicio+'T00:00:00Z')<=Date.parse(last.fim+'T00:00:00Z')+86400000;
+    if(adjacent)last.fim=last.fim>range.fim?last.fim:range.fim;else ranges.push({...range});
    }
    if(!ranges.length)return [];
-   const catalog=await get(APP_CONFIG.endpoints.modelo,{}, {silent:true,signal});
+   const catalog=await catalogFor(get,signal);
    if(!catalog.ok||!Array.isArray(catalog.tabelas))throw Error('Catálogo PCP indisponível.');
    const target=new Map(),priorities=new Map();
    for(const scope of scopes(units,catalog,totalSource)){
