@@ -26,7 +26,7 @@ pelo relatório, inclusive em semana cheia e no acumulado mensal.
 **Acumulado mensal — regra obrigatória:** sempre mostra os 12 meses do ano
 selecionado, Ave Nova, Real Alimentos e o total das duas. Unidade / Turno, Mês,
 Dia e Semana cheia não restringem a consulta, as colunas, os valores ou as metas
-do acumulado. A seleção única Unidade / Turno controla apenas o calendário.
+do acumulado. A seleção múltipla Unidade / Turno controla apenas o calendário.
 Real Alimentos + Ave Nova consolida dias, detalhamento e totais do calendário.
 Aves, Peso e Meta são somados; Diferença mantém os sinais dos saldos
 (equivalente a realizado total menos meta total).
@@ -42,23 +42,37 @@ e a linha **Total do ano**, com cada empresa e o consolidado na última coluna.
 Cada ano selecionado tem sua própria linha de total. Aves e Peso (kg) somam os
 valores disponíveis até D−1; as metas seguem os dias realizados de cada empresa.
 Uma referência incompleta deixa a meta e a diferença consolidadas sem valor ou
-cor parcial. Peso continua sem meta. Os totais usam vinho claro do tema e a
+cor parcial. Peso continua sem meta. Apenas a linha anual usa vinho claro;
+as linhas mensais alternam branco/bege em todas as colunas. A
 tabela ocupa a largura do card abaixo do calendário, sem rolagem horizontal.
 Em telas estreitas, reorganiza os blocos mantendo os valores e os rótulos.
 
 A rotina de leitura seleciona o maior registro de Cabeças por empresa/dia
 na seção escolhida também no diário comum. O mensal sempre usa os consolidados
 das duas empresas e suas metas completas, sem aplicar turnos do calendário.
-Ano e Grupo continuam aplicáveis; Unidade / Turno, Mês, Dia e Semana cheia não
+Ano continua aplicável. Grupo fica oculto e sem restrição em Produtividade;
+Unidade / Turno, Mês, Dia e Semana cheia não
 restringem o acumulado e não provocam uma nova consulta mensal por si mesmos.
 
-**Filtro Unidade / Turno:** seleção única, reutilizando o menu existente, com
-exatamente cinco opções: Ave Nova; 1° Turno - AN; 2° Turno - AN; Real Alimentos;
-Real Alimentos + Ave Nova. As opções de empresa usam seus consolidados existentes.
-Ave Nova é a seleção inicial e volta ao clicar em Limpar filtros; não há opção de
-selecionar todas ou deixar vazio em Produtividade. Trocar para Rendimento restaura
-sua seleção múltipla anterior. O título mostra o mês e a unidade/turno, por exemplo
+**Filtro Unidade / Turno:** seleção múltipla, reutilizando o menu existente, com
+quatro opções: Ave Nova; 1° Turno - AN; 2° Turno - AN; Real Alimentos.
+Marcar 1T e 2T converte a seleção em Ave Nova. Marcar Ave Nova e Real deixa as
+duas caixas selecionadas e mostra Real Alimentos + Ave Nova no resumo, sem
+uma opção combinada pronta. Real com apenas um turno da Ave Nova também é válido.
+Ave Nova é a seleção inicial e volta ao clicar em Limpar filtros; a última
+seleção vazia também retorna a Ave Nova. Rendimento restaura suas opções,
+seleção e comportamento originais. Grupo é oculto apenas em Produtividade.
+O título mostra o mês e a unidade/turno, por exemplo
 `Outubro de 2026 - Ave Nova`. Os valores numéricos do mensal ficam alinhados à direita.
+
+**Detalhes mensais da Ave Nova — 05/11/2026:** cada mês e o total anual mostram
+1° Turno - AN, 2° Turno - AN e Total dentro da coluna Ave Nova. Os dois detalhes
+usam `diario_industria_turnos`, com as regras existentes, metas do respectivo
+turno e limite D−1. O Total continua no diário comum, sem ser substituído pela
+soma dos pesos dos turnos. A divergência entre as fontes permanece em investigação.
+Os detalhes independem dos filtros Unidade / Turno, Mês, Dia e Semana cheia.
+Não são somados novamente no Total do mês ou no Total do ano: estes usam
+somente os consolidados das duas empresas.
 
 O diagnóstico mostrou que **Recepção + Compra já estão incluídas em Abate - Total**.
 Somar todas essas seções produzia exatamente o dobro nos 23 dias de outubro

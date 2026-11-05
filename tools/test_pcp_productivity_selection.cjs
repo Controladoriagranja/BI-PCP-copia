@@ -1,0 +1,42 @@
+// Seleção múltipla restrita à Produtividade e semanas ISO, sem API real.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const source=fs.readFileSync(path.join(__dirname,'../assets/js/pcp-cirurgico.js'),'utf8');
+const PcpMulti={values:v=>String(v??'').split(',').filter(Boolean)};
+const context={window:{},ApiScreen:{escape:String},PcpMulti,Event:class{constructor(type){this.type=type;}}};
+vm.runInNewContext(source.replace('return {mount};','return {mount,productivitySelection,selectedHeadCompanies,selectedHeadTurns,productionWeek,createProductivityUnitFilter,createProductivityGroupFilter};'),context);
+const app=context.window.PcpCirurgico;
+const list=value=>Array.from(app.productivitySelection(value));
+assert.deepEqual(list('1,2'),['10']);
+assert.deepEqual(list('1,2,111'),['10','111']);
+assert.deepEqual(list('10,1,2,111'),['10','111']);
+assert.deepEqual(list('1,111'),['1','111']);
+assert.deepEqual(Array.from(app.selectedHeadCompanies('1,111')),['10','111']);
+assert.deepEqual(Array.from(app.selectedHeadTurns('1,111','10')),['1']);
+assert.equal(app.selectedHeadTurns('1,111','111'),null,'Real permanece consolidada');
+for(const [date,year,week] of [['2020-12-28',2020,53],['2021-01-01',2020,53],['2021-01-04',2021,1],['2025-12-29',2026,1],['2026-11-02',2026,45]]){
+ const result=app.productionWeek(date);assert.equal(result.year,year);assert.equal(result.week,week);
+}
+let listener;const classes=new Set();
+const host={classList:{toggle(name,on){if(on)classes.add(name);else classes.delete(name);}},addEventListener(type,handler){listener=handler;}};
+const label={firstChild:{textContent:'Unidade'}};
+const controller={getState:()=>({host}),closeAll(){},summary:state=>state.selected.size+' selecionados'};
+const select={value:'1,111',innerHTML:'ORIGINAL',closest:()=>label,dispatchEvent(){},pcpMulti:{controller,field:{}}};
+const filter=app.createProductivityUnitFilter(select);
+filter.sync('produtividade');assert.equal(select.value,'10');
+assert.equal((select.innerHTML.match(/<option/g)||[]).length,4);
+assert.doesNotMatch(select.innerHTML,/value="both"/,'Não há opção combinada pronta');
+assert.match(select.innerHTML,/1° Turno - AN/);assert.match(select.innerHTML,/2° Turno - AN/);
+const click=(value,checked=true)=>listener({target:{value,checked,matches:()=>true,hasAttribute:()=>false},stopImmediatePropagation(){}});
+click('1');assert.equal(select.value,'1');
+click('111');assert.equal(select.value,'1,111');
+click('2');assert.equal(select.value,'10,111');
+assert.equal(controller.summary({selected:new Set(['10','111'])}),'Real Alimentos + Ave Nova');
+click('10',false);assert.equal(select.value,'111');
+click('111',false);assert.equal(select.value,'10','Ao esvaziar, mantém uma unidade pré-selecionada');
+filter.sync('rendimento');assert.equal(select.value,'1,111');assert.equal(select.innerHTML,'ORIGINAL');assert.equal(label.firstChild.textContent,'Unidade');
+assert.equal(controller.summary({selected:new Set(['10','111'])}),'2 selecionados','Rendimento preserva resumo original');
+const groupLabel={hidden:false},group={value:'familias',closest:()=>groupLabel};
+const groupFilter=app.createProductivityGroupFilter(group);
+groupFilter.sync('produtividade');assert.equal(group.value,'');assert.equal(groupLabel.hidden,true);
+groupFilter.sync('produtividade');groupFilter.sync('rendimento');assert.equal(group.value,'familias');assert.equal(groupLabel.hidden,false);
+console.log('OK: quatro opções, múltipla seleção, normalização de turnos, resumo combinado, restauração de Rendimento, Grupo e semanas ISO.');

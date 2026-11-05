@@ -7,8 +7,13 @@ window.PcpCirurgico=(()=>{
  const combinedCompanyLabel='Real Alimentos + Ave Nova';
  const productivityUnitOptions=[
   ['10','Ave Nova',['10'],null],['1','1° Turno - AN',['10'],'1'],['2','2° Turno - AN',['10'],'2'],
-  ['111','Real Alimentos',['111'],null],['both','Real Alimentos + Ave Nova',['10','111'],null]
+  ['111','Real Alimentos',['111'],null]
  ];
+ function productivitySelection(units){
+  const selected=new Set(PcpMulti.values(units).flatMap(value=>value==='both'?['10','111']:[value]));
+  if(selected.has('10')||(selected.has('1')&&selected.has('2'))){selected.add('10');selected.delete('1');selected.delete('2');}
+  return productivityUnitOptions.map(option=>option[0]).filter(value=>selected.has(value));
+ }
  function headCompany(value){
   const text=String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
   if(/^(?:0*10|an)$/.test(text)||/\bave ?nova\b/.test(text))return '10';
@@ -16,13 +21,13 @@ window.PcpCirurgico=(()=>{
   return null;
  }
  function selectedHeadCompanies(units){
-  const selected=PcpMulti.values(units);
+  const selected=productivitySelection(units);
   const option=selected.length===1&&productivityUnitOptions.find(option=>option[0]===selected[0]);
   if(option)return option[2];
   return ['10','111'].filter(code=>!selected.length||selected.includes(code)||(code==='10'&&selected.some(v=>v==='1'||v==='2')));
  }
  function selectedHeadTurns(units,company){
-  const selected=PcpMulti.values(units),option=selected.length===1&&productivityUnitOptions.find(option=>option[0]===selected[0]);
+  const selected=productivitySelection(units),option=selected.length===1&&productivityUnitOptions.find(option=>option[0]===selected[0]);
   if(option)return option[3]?[option[3]]:company==='10'?['1','2']:null;
   return company==='10'?(!selected.length||selected.includes('10')?['1','2']:selected.filter(v=>v==='1'||v==='2')):null;
  }
@@ -268,11 +273,23 @@ window.PcpCirurgico=(()=>{
    const multi=select.pcpMulti,host=multi?.controller.getState(multi.field).host;
    if(host&&boundHost!==host){
     boundHost=host;
+    const originalSummary=multi.controller.summary;
+    if(typeof originalSummary==='function')multi.controller.summary=function(state){
+     const chosen=productivitySelection([...state.selected].join(','));
+     return active&&chosen.includes('10')&&chosen.includes('111')?combinedCompanyLabel:originalSummary.call(this,state);
+    };
     host.addEventListener('change',event=>{
      if(!active||!event.target.matches('input[type="checkbox"]'))return;
      event.stopImmediatePropagation();
      if(event.target.hasAttribute('data-all')||!allowed.includes(String(event.target.value)))return;
-     unit=String(event.target.value);select.value=unit;select.dispatchEvent(new Event('change',{bubbles:true}));
+     const value=String(event.target.value),chosen=new Set(productivitySelection(select.value));
+     if(event.target.checked){
+      chosen.add(value);
+      if(value==='10'){chosen.delete('1');chosen.delete('2');}
+      else if(value==='1'||value==='2')chosen.delete('10');
+     }else chosen.delete(value);
+     unit=productivitySelection([...chosen].join(',')).join(',')||'10';
+     select.value=unit;select.dispatchEvent(new Event('change',{bubbles:true}));
     },true);
    }
    if(mode==='produtividade'){
@@ -283,14 +300,28 @@ window.PcpCirurgico=(()=>{
      select.value=unit;multi?.controller.closeAll();
     }
     else{
-     const selected=PcpMulti.values(select.value).filter(value=>allowed.includes(value));
-     unit=selected.length===1?selected[0]:selected.includes(unit)?unit:selected[0]||'10';
+     unit=productivitySelection(select.value).join(',')||'10';
      if(select.value!==unit)select.value=unit;
     }
    }else if(active){active=false;select.innerHTML=savedOptions;if(labelText)labelText.textContent=originalLabel;select.value=savedUnits;multi?.controller.closeAll();}
-   if(host)host.classList.toggle('cg-unit-single',active);
+   if(host)host.classList.toggle('cg-unit-multiple',active);
   }
   return {sync};
+ }
+ function createProductivityGroupFilter(select){
+  const label=select.closest('label');let active=false,saved='';
+  return {sync(mode){
+   if(mode==='produtividade'){
+    if(!active){saved=select.value;active=true;}
+    select.value='';label.hidden=true;
+   }else if(active){active=false;select.value=saved;label.hidden=false;}
+  }};
+ }
+ function productionWeek(date){
+  const thursday=new Date(date+'T00:00:00Z');
+  thursday.setUTCDate(thursday.getUTCDate()+4-(thursday.getUTCDay()||7));
+  const year=thursday.getUTCFullYear();
+  return {year,week:Math.ceil(((thursday-new Date(Date.UTC(year,0,1)))/86400000+1)/7)};
  }
  // Nova modificação de 29/10/2026: peso ao lado do dia, sem alterar valores.
  function productivityHeaderWeights(rows){
@@ -311,8 +342,8 @@ window.PcpCirurgico=(()=>{
   let selectedDay='',visibleDays=new Set();
   const formatHeads=value=>value==null?'—':value.toLocaleString('pt-BR',{maximumFractionDigits:6});
   const birdUnit=value=>value===1?'ave':'aves';
-  const calendarUnit=()=>PcpMulti.values(fields.Unidade?.value).find(value=>productivityUnitOptions.some(option=>option[0]===value))||'10';
-  const calendarUnitLabel=()=>({'10':'Ave Nova','111':'Real Alimentos','1':'Ave Nova - 1º turno','2':'Ave Nova - 2º turno'}[calendarUnit()]||productivityUnitOptions.find(option=>option[0]===calendarUnit())[1]);
+  const calendarUnit=()=>productivitySelection(fields.Unidade?.value).join(',')||'10';
+  const calendarUnitLabel=()=>calendarUnit()==='10,111'?combinedCompanyLabel:productivitySelection(calendarUnit()).map(value=>({'10':'Ave Nova','111':'Real Alimentos','1':'Ave Nova - 1º turno','2':'Ave Nova - 2º turno'}[value])).join(' + ');
   function dayHeads(date){
    if(getHeads().status!=='ready'||!getHeads().limit||date>getHeads().limit||!PcpMulti.includes(fields.Grupo?.value,'producao'))return [];
    const companies=selectedHeadCompanies(calendarUnit()),rows=getHeads().rows.filter(row=>row.data===date&&companies.includes(row.empresa_codigo));
@@ -341,7 +372,7 @@ window.PcpCirurgico=(()=>{
    return '<td class="cg-production-total" data-cg-total="'+kind+'" data-cg-label="'+esc(label)+'" aria-label="'+esc(label)+'">'+(weights&&rows.length===1?'<span class="cg-production-total-header">'+weights+'</span>':'')+headsMarkup(rows,rows.length>1)+'</td>';
   }
   function displayRows(rows){
-   if(calendarUnit()!=='both'||!rows.length||rows[0].empresa_codigo==='both')return rows;
+   if(selectedHeadCompanies(calendarUnit()).length<2||!rows.length||rows[0].empresa_codigo==='both')return rows;
    const sum=field=>{const values=rows.map(row=>row[field]).filter(Number.isFinite);return values.length?values.reduce((total,value)=>total+value,0):null;};
    const value=sum('quantidade_cabecas');
    const ratings=rows.filter(row=>Number.isFinite(row.quantidade_cabecas)).map(row=>productivityTargets.grade(row.empresa_codigo,row._days||[row],getHeads().metas||[],calendarUnit()));
@@ -400,9 +431,12 @@ window.PcpCirurgico=(()=>{
      const classes=[outside?'cg-production-adjacent':'',bothEmpty?'cg-production-rest':''].filter(Boolean).join(' ');
      return '<td data-cg-label="'+esc(weekdays[new Date(date+'T00:00:00Z').getUTCDay()])+'"'+(classes?' class="'+classes+'"':'')+'><button type="button" data-cg-day="'+date+'" aria-pressed="false" aria-label="'+esc(day+' de '+(outside?monthName(Number(date.slice(0,4)),Number(date.slice(5,7))):label)+' · '+(allowed?(summary||emptyMessage(date)):'Fora do filtro de dia'))+'"'+(allowed?'':' disabled')+'>'+productivityDayHeader(day,date,outside,rows.length>1?[]:rows)+headsMarkup(rows,rows.length>1)+'</button></td>';
     });
-    const weeks=Array.from({length:dates.length/7},(_,week)=>'<tr>'+slots.slice(week*7+1,week*7+7).join('')+totalCell(dates.slice(week*7,week*7+7),'week-'+week,'Total semanal')+'</tr>').join('');
+    const weeks=Array.from({length:dates.length/7},(_,week)=>{
+     const monday=new Date(Date.UTC(year,month-1,2-new Date(Date.UTC(year,month-1,1)).getUTCDay()+week*7)).toISOString().slice(0,10),number=productionWeek(monday);
+     return '<tr><th scope="row" class="cg-production-week-number" data-cg-week="'+number.year+'-W'+String(number.week).padStart(2,'0')+'"><span title="Semana '+number.week+' de '+number.year+'">'+String(number.week).padStart(2,'0')+'</span></th>'+slots.slice(week*7+1,week*7+7).join('')+totalCell(dates.slice(week*7,week*7+7),'week-'+week,'Total semanal')+'</tr>';
+    }).join('');
     const footer=weekdays.slice(1).map((day,index)=>totalCell(dates.filter((date,i)=>i%7===index+1),'weekday-'+(index+1),'Total de '+day.toLowerCase())).join('')+totalCell(dates,'month',fullWeek?'Total do período':'Total do mês');
-    return '<div class="cg-production-month"><h3>'+esc(label.charAt(0).toUpperCase()+label.slice(1)+' - '+calendarUnitLabel())+'</h3><div class="cg-production-scroll"><table class="cg-production-grid"><caption class="cg-production-sr">Calendário de Produção · '+esc(label)+'</caption><thead><tr>'+weekdays.slice(1).map(day=>'<th scope="col"><abbr title="'+day+'">'+day.slice(0,3)+'</abbr></th>').join('')+'<th scope="col" title="Total da semana, incluindo os domingos do período.">Total semanal</th></tr></thead><tbody>'+weeks+'</tbody><tfoot><tr>'+footer+'</tr></tfoot></table></div></div>';
+    return '<div class="cg-production-month"><h3>'+esc(label.charAt(0).toUpperCase()+label.slice(1)+' - '+calendarUnitLabel())+'</h3><div class="cg-production-scroll"><table class="cg-production-grid"><caption class="cg-production-sr">Calendário de Produção · '+esc(label)+'</caption><colgroup><col class="cg-production-week-col">'+Array.from({length:7},()=>'<col>').join('')+'</colgroup><thead><tr><th scope="col" title="Semana do ano (ISO)">Sem.</th>'+weekdays.slice(1).map(day=>'<th scope="col"><abbr title="'+day+'">'+day.slice(0,3)+'</abbr></th>').join('')+'<th scope="col" title="Total da semana, incluindo os domingos do período.">Total semanal</th></tr></thead><tbody>'+weeks+'</tbody><tfoot><tr><th class="cg-production-week-number"><span class="cg-production-sr">Totais</span></th>'+footer+'</tr></tfoot></table></div></div>';
    }).join('');
    if(!visibleDays.has(selectedDay))selectedDay='';
    renderDetail();
@@ -445,7 +479,7 @@ window.PcpCirurgico=(()=>{
    if(host.closest('[hidden]'))return;
    // O acumulado sempre mostra as duas empresas, sem o filtro Unidade / Turno do calendário.
    const data=getData(),months=periods(),units='',groupAllowed=PcpMulti.includes(fields.Grupo.value,'producao'),keys=['10','111'],sums=new Map(),dailyRows=new Map(),weights=new Map();
-   status.hidden=data.status!=='loading'&&data.status!=='error';
+   status.hidden=data.status!=='loading'&&data.status!=='error'&&data.turnosStatus!=='error';
    if(data.status==='ready'&&groupAllowed&&data.limit){
     for(const row of data.rows){
      if(row.data>data.limit||row.quantidade_cabecas==null||!Number.isFinite(row.quantidade_cabecas))continue;
@@ -456,14 +490,32 @@ window.PcpCirurgico=(()=>{
      if(row.data>data.limit||!Number.isFinite(row.peso_vivo))continue;
      const key=row.empresa_codigo+'|'+row.data.slice(0,7);weights.set(key,(weights.get(key)??0)+row.peso_vivo);
     }
+    // Detalhe por turno independente dos totais consolidados do diário comum.
+    for(const row of data.turnosRows||[]){
+     if(row.data>data.limit||row.empresa_codigo!=='10')continue;
+     for(const turn of ['1','2']){
+      const value=row.turnos?.[turn];if(!Number.isFinite(value))continue;
+      const key=turn+'|'+row.data.slice(0,7);sums.set(key,(sums.get(key)??0)+value);
+      if(!dailyRows.has(key))dailyRows.set(key,[]);
+      dailyRows.get(key).push({...row,quantidade_cabecas:value});
+     }
+    }
+    for(const row of data.turnosPesos||[]){
+     if(row.data>data.limit||row.empresa_codigo!=='10')continue;
+     for(const turn of ['1','2']){
+      const value=row.turnos?.[turn];if(!Number.isFinite(value))continue;
+      const key=turn+'|'+row.data.slice(0,7);weights.set(key,(weights.get(key)??0)+value);
+     }
+    }
    }
    status.textContent=!groupAllowed?'Aves pertencem ao grupo Produção e perdas.':data.status==='loading'?'Consultando acumulados mensais…':data.status==='error'?'Não foi possível consultar o acumulado mensal. Clique em Produtividade para tentar novamente.':'Totais de aves por mês'+(data.limit?' · até '+data.limit.split('-').reverse().join('/')+' (D−1)':'')+'. Mês, Dia e Semana cheia não alteram esta tabela. Role verticalmente para consultar os meses de janeiro a dezembro.';
+   if(data.status==='ready'&&data.turnosStatus==='error')status.textContent='Não foi possível consultar os turnos da Ave Nova. Os totais consolidados permanecem disponíveis.';
    const signature=months.map(p=>p.year+'-'+p.month).join(','),reset=signature!==lastPeriods;lastPeriods=signature;
    if(!months.length){box.innerHTML='<p class="pcp-report-notice">Sem meses disponíveis para o ano selecionado.</p>';lastHTML='';return;}
    function summary(code,periods){
     const entries=periods.map(period=>code+'|'+period),rows=entries.flatMap(key=>dailyRows.get(key)||[]);
     const sum=map=>{const values=entries.map(key=>map.get(key)).filter(Number.isFinite);return values.length?values.reduce((a,b)=>a+b,0):null;};
-    return {value:sum(sums),weight:sum(weights),rating:productivityTargets.grade(code,rows,data.metas||[],units)};
+    return {value:sum(sums),weight:sum(weights),rating:productivityTargets.grade(code==='1'||code==='2'?'10':code,rows,data.metas||[],code==='1'||code==='2'?code:units)};
    }
    function combined(items){
     const sum=field=>{const values=items.map(item=>item[field]).filter(Number.isFinite);return values.length?values.reduce((a,b)=>a+b,0):null;};
@@ -471,9 +523,15 @@ window.PcpCirurgico=(()=>{
     const meta=actual.length&&actual.every(item=>Number.isFinite(item.rating.meta))?actual.reduce((total,item)=>total+item.rating.meta,0):null;
     return {value,weight:sum('weight'),rating:{meta,className:meta==null?'':value>=meta?'cg-prod-good':'cg-prod-bad'}};
    }
-   function cell({value,weight,rating},className='',label=''){
+   function cellMarkup({value,weight,rating}){
     const quantity=value==null?'—':'<strong'+(rating.className?' class="'+rating.className+'" title="Meta: '+esc(rating.meta.toLocaleString('pt-BR'))+' aves"':'')+'>'+esc(value.toLocaleString('pt-BR',{maximumFractionDigits:6}))+'</strong> <small>'+(value===1?'ave':'aves')+'</small>';
-    return '<td data-cg-label="'+esc(label)+'"'+(className?' class="'+className+'"':'')+'>'+productivityWeightMarkup(weight)+'<span class="cg-monthly-quantity">'+quantity+'</span>'+productivityReferenceMarkup(value,rating)+'</td>';
+    return productivityWeightMarkup(weight)+'<span class="cg-monthly-quantity">'+quantity+'</span>'+productivityReferenceMarkup(value,rating);
+   }
+   function cell(item,className='',label=''){
+    return '<td data-cg-label="'+esc(label)+'"'+(className?' class="'+className+'"':'')+'>'+cellMarkup(item)+'</td>';
+   }
+   function aveNovaCell(total,periods){
+    return '<td data-cg-label="Ave Nova"><div class="cg-monthly-an-breakdown">'+['1','2'].map(turn=>'<section data-cg-month-turn="'+turn+'"><h4>'+esc(productivityUnitOptions.find(option=>option[0]===turn)[1])+'</h4>'+cellMarkup(summary(turn,periods))+'</section>').join('')+'<section data-cg-month-an-total><h4>Total</h4>'+cellMarkup(total)+'</section></div></td>';
    }
    const totalColumn=keys.length>1;
    const html='<table class="cg-table cg-monthly-table cg-monthly-pivot"><caption class="cg-production-sr">Acumulado mensal por empresa, total do mês e totais anuais até D−1</caption><colgroup><col class="cg-monthly-month-col">'+keys.map(()=>'<col>').join('')+(totalColumn?'<col>':'')+'</colgroup><thead><tr><th scope="col">Mês</th>'+keys.map(code=>'<th scope="col">'+esc(headCompanies[code])+'</th>').join('')+(totalColumn?'<th scope="col" class="cg-monthly-total">Total do mês</th>':'')+'</tr></thead><tbody>'+months.map(({year,month})=>{
@@ -481,11 +539,11 @@ window.PcpCirurgico=(()=>{
     const name=new Date(Date.UTC(year,month-1,1)).toLocaleDateString('pt-BR',{month:'long',timeZone:'UTC'});
     const rowClass=period===now?' class="cg-monthly-current"':period>now?' class="cg-monthly-future"':'';
     const items=keys.map(code=>summary(code,[period]));
-    let html='<tr data-cg-month-period="'+period+'"'+rowClass+'><th scope="row"><span class="cg-monthly-month-number">'+String(month).padStart(2,'0')+'</span><span class="cg-monthly-month-name">'+esc(name)+'</span><small>'+year+'</small></th>'+items.map((item,i)=>cell(item,'',headCompanies[keys[i]])).join('')+(totalColumn?cell(combined(items),'cg-monthly-total','Total do mês'):'')+'</tr>';
+    let html='<tr data-cg-month-period="'+period+'"'+rowClass+'><th scope="row"><span class="cg-monthly-month-number">'+String(month).padStart(2,'0')+'</span><span class="cg-monthly-month-name">'+esc(name)+'</span><small>'+year+'</small></th>'+items.map((item,i)=>keys[i]==='10'?aveNovaCell(item,[period]):cell(item,'',headCompanies[keys[i]])).join('')+(totalColumn?cell(combined(items),'cg-monthly-total','Total do mês'):'')+'</tr>';
     if(month===12){
      const annualPeriods=months.filter(p=>p.year===year).map(p=>p.year+'-'+String(p.month).padStart(2,'0'));
      const annual=keys.map(code=>summary(code,annualPeriods));
-     html+='<tr class="cg-monthly-annual" data-cg-total-year="'+year+'"><th scope="row">Total do ano<small>'+year+'</small></th>'+annual.map((item,i)=>cell(item,'',headCompanies[keys[i]])).join('')+(totalColumn?cell(combined(annual),'cg-monthly-grand-total','Total geral do ano'):'')+'</tr>';
+     html+='<tr class="cg-monthly-annual" data-cg-total-year="'+year+'"><th scope="row">Total do ano<small>'+year+'</small></th>'+annual.map((item,i)=>keys[i]==='10'?aveNovaCell(item,annualPeriods):cell(item,'',headCompanies[keys[i]])).join('')+(totalColumn?cell(combined(annual),'cg-monthly-grand-total','Total geral do ano'):'')+'</tr>';
     }
     return html;
    }).join('')+'</tbody></table>';
@@ -504,6 +562,7 @@ window.PcpCirurgico=(()=>{
   const ids=['Ano','Mes','Dia','Unidade','Grupo'],fields=Object.fromEntries(ids.map(k=>[k,document.getElementById('cg'+k)]));let data=null,generation=0,controller,loading=false;
   const monthFilter=createProductivityMonthFilter(fields.Mes);
   const unitFilter=createProductivityUnitFilter(fields.Unidade);
+  const groupFilter=createProductivityGroupFilter(fields.Grupo);
   let headsState={status:'idle',rows:[]},headsKey='',headsGeneration=0,headsController=null;
   let monthlyState={status:'idle',rows:[]},monthlyKey='',monthlyGeneration=0,monthlyController=null;
   const indicatorWeekFilter=document.createElement('label');indicatorWeekFilter.className='cg-production-week-filter';indicatorWeekFilter.hidden=true;
@@ -521,6 +580,7 @@ window.PcpCirurgico=(()=>{
    filter.classList.toggle('cg-productivity-filters',mode==='produtividade');
    const monthChanged=monthFilter.sync(mode);
    unitFilter.sync(mode);
+   groupFilter.sync(mode);
    if(mode==='produtividade'&&monthChanged)fields.Dia.value='';
    for(const panel of yieldPanels)panel.hidden=mode==='produtividade';
    indicatorWeekFilter.hidden=mode!=='produtividade';
@@ -573,10 +633,10 @@ window.PcpCirurgico=(()=>{
    monthlyKey=key;const id=++monthlyGeneration;monthlyController?.abort();monthlyController=new AbortController();
    monthlyState={status:'loading',rows:[],limit};monthly.render();
    try{
-    const [production,targets,weight]=await Promise.allSettled([productivityHeads.load(apiGet,periods,units,monthlyController.signal,false,limit,'diario'),productivityTargets.load(apiGet,periods,monthlyController.signal,false,limit),productivityWeight.load(apiGet,periods,units,monthlyController.signal,false,limit,'diario')]);
+    const [production,targets,weight,turns,turnWeights]=await Promise.allSettled([productivityHeads.load(apiGet,periods,units,monthlyController.signal,false,limit,'diario'),productivityTargets.load(apiGet,periods,monthlyController.signal,false,limit),productivityWeight.load(apiGet,periods,units,monthlyController.signal,false,limit,'diario'),productivityHeads.load(apiGet,periods,'10',monthlyController.signal,false,limit),productivityWeight.load(apiGet,periods,'10',monthlyController.signal,false,limit)]);
     if(production.status==='rejected')throw production.reason;
     if(id!==monthlyGeneration)return;
-    monthlyState={status:'ready',rows:production.value,metas:targets.status==='fulfilled'?targets.value:[],pesos:weight.status==='fulfilled'?weight.value:[],pesoStatus:weight.status==='fulfilled'?'ready':'error',limit};
+    monthlyState={status:'ready',rows:production.value,metas:targets.status==='fulfilled'?targets.value:[],pesos:weight.status==='fulfilled'?weight.value:[],pesoStatus:weight.status==='fulfilled'?'ready':'error',turnosRows:turns.status==='fulfilled'?turns.value:[],turnosPesos:turnWeights.status==='fulfilled'?turnWeights.value:[],turnosStatus:turns.status==='fulfilled'?'ready':'error',limit};
    }catch(e){
     if(id!==monthlyGeneration)return;
     monthlyState={status:'error',rows:[],limit};

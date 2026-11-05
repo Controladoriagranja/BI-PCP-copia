@@ -45,9 +45,11 @@ TEST = r'''
   const renditionStyle=()=>['display','gridTemplateColumns','padding'].map(key=>getComputedStyle(document.querySelector('.cg-filters'))[key]);
   const originalStyle=renditionStyle();
   flag('produtividade').click();await flush();
-  assert(JSON.stringify([...unit.options].map(o=>o.textContent))===JSON.stringify(['Ave Nova','1° Turno - AN','2° Turno - AN','Real Alimentos','Real Alimentos + Ave Nova']),'Cinco opções com nomes e ordem exatos');
+  assert(JSON.stringify([...unit.options].map(o=>o.textContent))===JSON.stringify(['Ave Nova','1° Turno - AN','2° Turno - AN','Real Alimentos']),'Quatro opções com nomes e ordem exatos');
   assert(unit.closest('label').firstChild.textContent==='Unidade / Turno','Nome do filtro único');
-  const expected={'10':[222318],'1':[113244],'2':[109074],'111':[142587],'both':[364905]};
+  const expected={'10':[222318],'1':[113244],'2':[109074],'111':[142587],'10,111':[364905],'1,111':[255831],'2,111':[251661]};
+  assert(document.getElementById('cgGrupo').closest('label').hidden,'Grupo oculto somente em Produtividade');
+  assert([...document.querySelectorAll('.cg-production-grid tbody [data-cg-week]')].map(cell=>cell.dataset.cgWeek).join(',')==='2026-W45,2026-W46,2026-W47,2026-W48,2026-W49','Semanas ISO nas linhas do calendário');
   const parse=element=>Number(element.textContent.replace(/[^\d-]/g,''));
   function checkLayout(value){
    const root=document.getElementById('cgProdutividade'),calendar=root.firstElementChild,monthly=root.lastElementChild;
@@ -68,24 +70,35 @@ TEST = r'''
   }
   for(const [value,totals] of Object.entries(expected)){
    const menu=document.getElementById('cgUnidadeMulti');
+   unit.value='10';unit.dispatchEvent(new Event('change',{bubbles:true}));await flush();
    if(!menu.classList.contains('open'))menu.querySelector('button').click();
    assert(document.documentElement.scrollWidth<=innerWidth,'Menu do filtro provoca transbordamento');
-   document.querySelector('#cgUnidadeMulti input[type="checkbox"][value="'+value+'"]').click();await flush();
+   const clickUnit=async(code)=>{document.querySelector('#cgUnidadeMulti input[type="checkbox"][value="'+code+'"]').click();await flush();};
+   if(value==='111'){await clickUnit('111');await clickUnit('10');}
+   else{for(const code of value.split(',')){if(code!=='10')await clickUnit(code);}}
+   if(value==='10,111')assert(menu.querySelector('.checkbox-multiselect-label').textContent==='Real Alimentos + Ave Nova','Resumo combinado sem opção pronta');
    if(menu.classList.contains('open'))menu.querySelector('button').click();
-   assert(unit.value===value,'Seleção única '+value);
+   assert(unit.value===value,'Seleção múltipla normalizada '+value);
    const totalCell=document.querySelector('[data-cg-total="month"]');
    const actual=[...totalCell.querySelectorAll('.cg-production-heads>span>strong')].map(parse);
    assert(JSON.stringify(actual)===JSON.stringify(totals),'Total do calendário '+value+': '+actual+' / '+totals);
    const monthRow=document.querySelector('[data-cg-month-period="2026-11"]');
    const annualRow=document.querySelector('[data-cg-total-year="2026"]');
-   const values=row=>[...row.querySelectorAll('.cg-monthly-quantity>strong')].map(parse);
+   const values=row=>[row.querySelector('[data-cg-month-an-total] .cg-monthly-quantity>strong'),row.querySelector('td[data-cg-label="Real Alimentos"]>.cg-monthly-quantity>strong'),row.querySelector('td[data-cg-label="Total do mês"]>.cg-monthly-quantity>strong'),row.querySelector('td[data-cg-label="Total geral do ano"]>.cg-monthly-quantity>strong')].filter(Boolean).map(parse);
    const monthlyExpected=[222318,142587,364905];
    const monthlyTable=document.querySelector('.cg-monthly-pivot');
    assert(JSON.stringify([...monthlyTable.querySelectorAll('thead th')].map(cell=>cell.textContent))===JSON.stringify(['Mês','Ave Nova','Real Alimentos','Total do mês']),'Mensal sempre com as duas empresas e total, seleção '+value);
    assert(monthlyTable.querySelectorAll('[data-cg-month-period]').length===12,'Mensal sempre com os 12 meses, seleção '+value);
    assert(JSON.stringify(values(monthRow))===JSON.stringify(monthlyExpected),'Mensal '+value+': '+values(monthRow));
    assert(JSON.stringify(values(annualRow))===JSON.stringify(monthlyExpected),'Anual '+value);
-   if(value==='both'){
+   assert(JSON.stringify([...monthRow.querySelectorAll('[data-cg-month-turn] .cg-monthly-quantity>strong')].map(parse))===JSON.stringify([113244,109074]),'Detalhes mensais sempre com os dois turnos');
+   assert(JSON.stringify([...monthRow.querySelectorAll('[data-cg-month-turn] .cg-prod-weight strong')].map(parse))===JSON.stringify([360210,339005]),'Pesos dos turnos sem alterar consolidado');
+   assert(JSON.stringify([...monthRow.querySelectorAll('[data-cg-month-turn] .cg-prod-reference>span:first-child>span:last-child')].map(parse))===JSON.stringify([130000,110000]),'Metas mensais por turno');
+   if(innerWidth>=1100){
+    const tops=[...document.querySelectorAll('.cg-productivity-filters .cg-filter-grid>label:not([hidden]) .checkbox-multiselect-trigger,.cg-productivity-filters .cg-filter-actions,.cg-productivity-filters #cgLimpar')].map(el=>el.getBoundingClientRect().bottom);
+    assert(tops.length>=6&&Math.max(...tops)-Math.min(...tops)<=3,'Filtros, flags e limpar na mesma linha: '+tops);
+   }
+   if(value==='10,111'){
     const stripes=[...document.querySelectorAll('.cg-monthly-pivot tr[data-cg-month-period]')].slice(0,3);
     const backgrounds=stripes.map(row=>[...row.children].map(cell=>getComputedStyle(cell).backgroundColor));
     assert(backgrounds.every(row=>row.every(color=>color===row[0])),'Cada mês deve ter fundo uniforme, incluindo a coluna Mês');
@@ -108,14 +121,18 @@ TEST = r'''
    results.push({unit:value,...checkLayout(value)});
   }
   // Dia limita o calendário, enquanto o mensal mantém os meses completos do recorte.
-  unit.value='both';unit.dispatchEvent(new Event('change',{bubbles:true}));await flush();
+  unit.value='10,111';unit.dispatchEvent(new Event('change',{bubbles:true}));await flush();
   const day=document.getElementById('cgDia');day.value='2026-11-02';day.dispatchEvent(new Event('change',{bubbles:true}));await flush();
   assert(JSON.stringify([...document.querySelectorAll('[data-cg-total="month"] .cg-production-heads>span>strong')].map(parse))===JSON.stringify([175428]),'Filtro de dia no calendário com empresas consolidadas');
-  assert(parse(document.querySelector('[data-cg-month-period="2026-11"] .cg-monthly-quantity>strong'))===222318,'Dia preserva recorte mensal');
+  assert(parse(document.querySelector('[data-cg-month-period="2026-11"] [data-cg-month-an-total] .cg-monthly-quantity>strong'))===222318,'Dia preserva recorte mensal');
   day.value='';day.dispatchEvent(new Event('change',{bubbles:true}));
-  const group=document.getElementById('cgGrupo');group.value='familias';group.dispatchEvent(new Event('change',{bubbles:true}));await flush();
-  assert(!document.querySelector('[data-cg-total="month"] .cg-production-heads>span>strong'),'Grupo incompatível não mostra aves');
-  group.value='';group.dispatchEvent(new Event('change',{bubbles:true}));await flush();
+  const menu=document.getElementById('cgUnidadeMulti');
+  unit.value='10';unit.dispatchEvent(new Event('change',{bubbles:true}));await flush();
+  if(!menu.classList.contains('open'))menu.querySelector('button').click();
+  menu.querySelector('input[value="1"]').click();await flush();assert(unit.value==='1','Primeiro turno isolado');
+  menu.querySelector('input[value="2"]').click();await flush();assert(unit.value==='10','Dois turnos se tornam Ave Nova total');
+  assert(menu.querySelector('input[value="10"]').checked&&!menu.querySelector('input[value="1"]').checked&&!menu.querySelector('input[value="2"]').checked,'Checkboxes refletem normalização');
+  menu.querySelector('button').click();
   document.getElementById('cgSemanaCheia').click();await flush();assert(document.getElementById('cgSemanaCheia').checked,'Semana cheia');
   document.querySelector('[data-cg-month="1"]').click();await flush();assert(document.getElementById('cgMes').value==='12','Seta sincroniza mês');
   document.querySelector('[data-cg-month="-1"]').click();await flush();assert(document.getElementById('cgMes').value==='11','Seta anterior');
@@ -124,10 +141,11 @@ TEST = r'''
   flag('rendimento').click();await flush();
   assert(JSON.stringify([...unit.options].map(o=>[o.value,o.textContent]))===JSON.stringify(originalOptions),'Restaurar opções originais de Rendimento');
   assert(unit.value==='1,111','Restaurar seleção múltipla de Rendimento');
+  assert(!document.getElementById('cgGrupo').closest('label').hidden,'Grupo restaurado em Rendimento');
   assert(rendimentoMarkup()===originalRendimento,'Preservar tabela de Rendimento');
   assert(JSON.stringify(renditionStyle())===JSON.stringify(originalStyle),'Preservar layout de filtros de Rendimento');
-  flag('produtividade').click();await flush();unit.value='both';unit.dispatchEvent(new Event('change',{bubbles:true}));await flush();
-  if(new URLSearchParams(location.search).has('monthly')){document.querySelector('#cgProdutividade>article:last-child').scrollIntoView({behavior:'instant',block:'start'});await flush();}
+  flag('produtividade').click();await flush();unit.value='10,111';unit.dispatchEvent(new Event('change',{bubbles:true}));await flush();
+  if(new URLSearchParams(location.search).has('monthly')){const style=document.createElement('style');style.textContent='.page-header,.filter-card,#estadoConsulta,#cgProdutividade>article:first-child{display:none!important}';document.head.append(style);const box=document.querySelector('.cg-monthly-scroll');box.scrollTop=box.scrollHeight;window.scrollTo(0,0);await flush();}
   assert(!errors.length,'Erros JS: '+errors.join('; '));
   document.getElementById('test-result').textContent=JSON.stringify({ok:true,width:innerWidth,selections:results.length,results,rendimentoPreserved:true});
  }catch(e){document.getElementById('test-result').textContent=JSON.stringify({ok:false,message:e.message,stack:e.stack,errors});}
@@ -184,7 +202,7 @@ def main():
             print(json.dumps(summary if value['ok'] else value, ensure_ascii=False))
     finally:
         server.shutdown()
-    result_name = 'results.json' if args.height == 900 else 'results-visual.json'
+    result_name = 'results-monthly.json' if args.monthly else ('results.json' if args.height == 900 else 'results-visual.json')
     (OUT / result_name).write_text(json.dumps(all_results, indent=2, ensure_ascii=False), encoding='utf-8')
     raise SystemExit(0 if all(r['ok'] for r in all_results) else 1)
 
